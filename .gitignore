@@ -18,3 +18,10 @@ _build/
 # oasis generated files
 setup.data
 setup.log
+
+# provided interps
+interps
+
+
+# merlin
+*/.merlin
