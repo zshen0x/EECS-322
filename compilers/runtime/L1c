@@ -1,0 +1,25 @@
+#!/bin/sh
+
+#clean up
+
+as="prog.S"
+obj="prog.o"
+binary="a.out"
+
+if [ -f prog.S ] ; then
+    rm prog.S
+fi
+
+if [ -f prog.o ] ; then
+    rm prog.o
+fi
+
+if [ -f a.out ] ; then
+    rm a.out
+fi
+
+
+./l1c.native "$@"
+as -o prog.o prog.S
+gcc -O2 -c -g -o runtime.o runtime.c
+gcc -o a.out prog.o runtime.o
