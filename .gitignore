@@ -21,7 +21,7 @@ setup.log
 
 # provided interps
 interps
-
+runtime.c
 
 # merlin
-*/.merlin
+.merlin

@@ -20,7 +20,7 @@ type l1 = Mem of l1 * l1
         | Cjmp of l1 * string * l1 * l1 * l1
         | Call of l1 * l1
         | Tail_call of l1 * l1 * int * int (* callee function args and spillls *)
-        | Return of int
+        | Return of int * int
         | Print
         | Allocate
         | ArrayError
@@ -106,9 +106,6 @@ let is_u s = is_w s || is_label s;;
 let is_t s = is_x s || is_integer s;;
 let is_s s = is_x s || is_integer s || is_label s;;
 
-(* compile your file here *)
-let compile f =
-  ()
 
 (* to get list of l1 *)
 let parse_func_sexpr = function
@@ -117,12 +114,11 @@ let parse_func_sexpr = function
       | (Atom labl) :: (Atom args) :: (Atom spills) :: rest
         when ((is_integer args) && (is_integer spills)) ->
         let args, spills = int_of_string args, int_of_string spills in
-
         let rec parse_inst_sexpr = function
           | Atom lb when is_label lb -> Label lb
           | Atom n when is_integer n -> Number (int_of_string n)
           | Atom r when is_x r -> Reg r
-          | Expr (Atom "return" :: []) -> Return spills
+          | Expr (Atom "return" :: []) -> Return (args, spills)
           | Expr (Atom "mem" :: reg :: off :: []) -> Mem (parse_inst_sexpr reg, parse_inst_sexpr off)
           | Expr (dst :: Atom "<-" :: src :: []) ->
             Mov (parse_inst_sexpr src, parse_inst_sexpr dst)
@@ -169,28 +165,36 @@ let compile_prog =
   | _ -> failwith "l1c error: not a valid program"
 *)
 
-(* l1 instruciton -> x64 string *)
-let rec compile_l1 = function 
+let rec compile_rnlm = function
   | Label s -> "_" ^ String.sub s 1 ((String.length s) - 1)
   | Reg reg -> "%" ^ reg
   | Number num -> "$" ^ string_of_int num
-  | Mem (reg, Number off) -> string_of_int off ^ "(" ^ compile_l1 reg ^ ")"
-  | Mov (src, dest) -> "movq " ^ compile_l1 src ^ ", " ^ compile_l1 dest
-  | Add (lhs, rhs) -> "addq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs
-  | Sub (lhs, rhs) -> "subq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs
-  | Mul (lhs, rhs) -> "imulq " ^ compile_l1 lhs ^ "," ^ compile_l1 rhs
-  | And (lhs, rhs) -> "andq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs
-  | Lshift (Reg reg, rhs) -> "sqlq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_l1 rhs
-  | Lshift (lhs, rhs) -> "sqlq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs
-  | Rshift (Reg reg, rhs) -> "sqrq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_l1 rhs
-  | Rshift (lhs, rhs) -> "sqrq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs
+  | Mem (reg, Number off) -> string_of_int off ^ "(" ^ compile_rnlm reg ^ ")"
+  | _ -> failwith "l1c error: not a reg, number, lablel"
+
+(* l1 instruciton -> x64 string *)
+let compile_l1 = function 
+  | Label s -> "_" ^ String.sub s 1 ((String.length s) - 1) ^ ":" (*this case should only work for when inst is lb*)
+(*| Reg reg -> "%" ^ reg
+  | Number num -> "$" ^ string_of_int num 
+  | Mem (reg, Number off) -> string_of_int off ^ "(" ^ compile_rnlm reg ^ ")" *)
+  | Mov (Label lb as src, dest) -> "movq $" ^ compile_rnlm src ^ ", " ^ compile_rnlm dest
+  | Mov (src, dest) -> "movq " ^ compile_rnlm src ^ ", " ^ compile_rnlm dest
+  | Add (lhs, rhs) -> "addq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Sub (lhs, rhs) -> "subq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Mul (lhs, rhs) -> "imulq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | And (lhs, rhs) -> "andq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Lshift (Reg reg, rhs) -> "sqlq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
+  | Lshift (lhs, rhs) -> "sqlq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Rshift (Reg reg, rhs) -> "sqrq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
+  | Rshift (lhs, rhs) -> "sqrq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
   | Cmp (dst, lhs, op, rhs) ->
     begin match lhs, rhs with
       | (Number l), (Number r) ->
         begin match op with
-          | "<=" -> (if l <= r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_l1 dst
-          | "<" -> (if l < r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_l1 dst
-          | "=" -> (if l = r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_l1 dst
+          | "<=" -> (if l <= r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_rnlm dst
+          | "<" -> (if l < r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_rnlm dst
+          | "=" -> (if l = r then "movq " ^ "$1" else "movq " ^ "$0") ^ ", " ^ compile_rnlm dst
           | _ -> failwith (Printf.sprintf "l1c error: unvalid cmp op string %s" op)
         end
       | _ ->
@@ -198,8 +202,8 @@ let rec compile_l1 = function
           | Reg reg ->
             let eightbit_reg = eightbit_reg_map reg in
             let set_inst_map, inst1 = match lhs with
-              | Number l -> adjset_map, "cmpq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs ^ "\n"
-              | _ -> set_map, "cmpq " ^ compile_l1 rhs ^ ", " ^ compile_l1 lhs ^ "\n"
+              | Number l -> adjset_map, "cmpq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs ^ "\n"
+              | _ -> set_map, "cmpq " ^ compile_rnlm rhs ^ ", " ^ compile_rnlm lhs ^ "\n"
             in
             let inst2 = set_inst_map op ^ " %" ^ eightbit_reg ^ "\n" in
             let inst3 = "movzbq " ^ " %" ^ eightbit_reg ^ " %" ^ reg in
@@ -216,60 +220,85 @@ let rec compile_l1 = function
           | "=" -> (=)
           | _ -> failwith (Printf.sprintf "l1c error: cjump invalid opeartor %s" op)
         in
-        "jmp " ^ if cmpare l r then compile_l1 labl0 else compile_l1 labl0
+        "jmp " ^ if cmpare l r then compile_rnlm labl0 else compile_rnlm labl0
       | _ ->
         let condjmp_inst_map, inst1 = match lhs with
-          | Number l -> adjcondjmp_map, "cmpq " ^ compile_l1 lhs ^ ", " ^ compile_l1 rhs ^ "\n"
-          | _ -> condjmp_map, "cmpq " ^ compile_l1 rhs ^ ", " ^ compile_l1 lhs ^ "\n"
+          | Number l -> adjcondjmp_map, "cmpq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs ^ "\n"
+          | _ -> condjmp_map, "cmpq " ^ compile_rnlm rhs ^ ", " ^ compile_rnlm lhs ^ "\n"
         in
         let condjmp = condjmp_inst_map op in
-        let inst2 = condjmp ^ " " ^ compile_l1 labl0 ^ "\n" in
-        let inst3 = "jmp " ^ compile_l1 labl1 in
+        let inst2 = condjmp ^ " " ^ compile_rnlm labl0 ^ "\n" in
+        let inst3 = "jmp " ^ compile_rnlm labl1 in
         inst1 ^ inst2 ^ inst3
     end
-  | Goto lb -> "jmp " ^ compile_l1 lb
+  | Goto lb -> "jmp " ^ compile_rnlm lb
   | Call (labl, Number n) ->
-    "subq $" ^ string_of_int (((if n - 6 < 0 then 0 else n - 6) + 1) * 8) ^ ", %rsp\n"
-    ^ "jmp " ^ compile_l1 labl
+    "subq $" ^ string_of_int (((if n > 6 then n - 6 else 0) + 1) * 8) ^ ", %rsp\n"
+    ^ "jmp " ^ compile_rnlm labl
       (* do argument space allocate and pass val only when call via move rsp*)
   | Tail_call (labl, my_args, callee_args, spills) ->
     "addq $" ^ string_of_int (((if callee_args > 6 then callee_args - 6 else 0) + spills) * 8) ^ ", %rsp\n"
-    ^ "jmp " ^ compile_l1 labl
+    ^ "jmp " ^ compile_rnlm labl
       (* "function can only be called at tail position when they have 6 or fewer args so not args in stack "*)
   | Print -> "call print"
   | Allocate -> "call allocate"
   | ArrayError -> "call array_error"
-  | Return spills -> "addq $" ^ string_of_int (spills * 8) ^ ", %rsp\n" ^ "ret"
+  | Return (args, spills) -> "addq $"
+                          ^ string_of_int (((if args > 6 then args - 6 else 0) + spills) * 8)
+                          ^ ", %rsp\n" ^ "ret"
   | _ -> failwith "l1c error: failed to matching instruction"
 
 (* function in l1 -> list of instructions in x64*)
 let compile_func = function
   | (Label lb as l1labl) :: Number args :: Number spills :: rest ->
-    let inst0 = compile_l1 l1labl ^ ":\n" in
+    let inst0 = compile_l1 l1labl ^ "\n" in
     let inst1 = "subq $" ^ string_of_int (spills * 8) ^ ", %rsp" in
     (* allocate spill when function are defined *)
     (inst0 ^ inst1) :: List.map compile_l1 rest
   | _ -> failwith "l1c error: not a valid function"
 
-(*
+let compile_prog = function
+  | Expr (Atom lb :: fun_lst) when is_label lb ->
+    let lb = String.sub lb 1 ((String.length lb) - 1) in
+    let part0 = "    .text\n    .globl go\ngo:\n" in
+    let part1 = "pushq %rbx\npushq %rbp\npushq %r12\npushq %r13\npushq %r14\npushq %r15\n" in
+    let part2 = Printf.sprintf "call _%s\n" lb in
+    let part3 = "popq %r15\npopq %r14\npopq %r13\npopq %r12\npopq %rbp\npopq %rbx\nretq" in
+    ((part0 ^ part1 ^ part2 ^ part3) :: []) :: List.map compile_func (List.map parse_func_sexpr fun_lst)
+  | _ as se -> failwith (Printf.sprintf "l1c error: unvalid program \n%s" (string_of_sexpr_indent (se :: [])))
+
+(* compile your file here *)
+let compile = function
+  | hd :: [] -> compile_prog hd (* one file one program only *)
+  | _ -> failwith "l1c error: not a valid program structure \
+                   this file containnig more than one program"
+let compose f g x = f (g x)
+
+let output_file clst file =
+  let oc = open_out file in
+  let prog_out = compose (output_string oc) (String.concat "\n") in
+  List.iter prog_out clst;
+  close_out oc
+;;
+
+
 let () =
   let len = Array.length Sys.argv in
   match len with
-  | 2 -> compile (parse_file Sys.argv.(1))
+  | 2 -> output_file (compile (parse_file Sys.argv.(1))) "prog.S"
   | _ -> failwith "l1c error: no input files"
-*)
 
-let test_case1 () =
+let test_cases1 () =
   let inst0 = Mov ((Mem ((Reg "rsp"), (Number (-8)))), (Reg "r10b"))
   and inst1 = Goto (Label":next")
   and inst2 = Mov ((Number 10), (Reg "r10"))
-  and inst3 = Mem ((Reg "r8"), (Number (-8)))
+  and inst3 = Mov ((Reg "rcx"), Mem ((Reg "r8"), (Number (16))))
   and inst4 = Label ":go"
   and inst5 = Label ":main"
   and inst6 = Print
   and inst7 = Allocate
   and inst8 = ArrayError
-  and inst9 = Return 24
+  and inst9 = Return (2, 4)
   and inst10 = Add ((Reg "r11"), (Reg "rbp"))
   and inst11 = Sub ((Reg "r11"), (Reg "r15"))
   and inst12 = Mul ((Reg "r9"), (Number 10))
@@ -284,6 +313,7 @@ let test_case1 () =
   and inst21 = Cjmp ((Reg "rax"), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
   and inst22 = Cjmp ((Number (-2)), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
   in
+  print_newline (print_string (compile_l1 inst0));
   print_newline (print_string (compile_l1 inst1));
   print_newline (print_string (compile_l1 inst2));
   print_newline (print_string (compile_l1 inst3));
@@ -293,7 +323,6 @@ let test_case1 () =
   print_newline (print_string (compile_l1 inst7));
   print_newline (print_string (compile_l1 inst8));
   print_newline (print_string (compile_l1 inst9));
-  print_newline (print_string (compile_l1 inst0));
   print_newline (print_string (compile_l1 inst10));
   print_newline (print_string (compile_l1 inst11));
   print_newline (print_string (compile_l1 inst12));
@@ -309,8 +338,8 @@ let test_case1 () =
   print_newline (print_string (compile_l1 inst22));
 ;;
 
-let test_case2 () =
-  let inst0 = Return 3
+let test_cases2 () =
+  let inst0 = Return (9, 3)
   and inst1 = Call (Label ":anthortherfunction", Number 11)
   and inst2 = Call (Label ":hello_world1", Number 6)
   and inst3 = Call (Label ":hello_world2", Number 0)
@@ -331,18 +360,44 @@ let test_case2 () =
   print_newline (print_string (compile_l1 inst8));
 ;;
 
-
 let test3 str =
-  let f se = print_newline (print_string (String.concat "\n" (compile_func (parse_func_sexpr se)))) in
+  let f se = print_newline (print_newline (print_string (String.concat "\n" (compile_func (parse_func_sexpr se))))) in
   List.iter f (parse_string str)
 
+(* problem label handling*)
 (* compiler function *)
 let test_cases3 () =
   let func0 = "(:go 0 0 (rdi <- 5) (call print 1) (return))\
                (:go 0 0 (rdi <- 5) (rsi <- 7) (call allocate 2) (rdi <- rax) (call print 1))\
+               (:main 0 0 (rdi <- 1) ((mem rsp -8) <- :f_ret) (call :f 1) :f_ret (return))\
+               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- 3) ((mem rsp 16) <- 5) (return))\
               "
   in
   test3 func0
 
+let test4 str =
+  let out strlst = print_newline (print_newline (print_string (String.concat "\n" strlst))) in
+  let prog_out = List.iter out in
+  List.iter prog_out (List.map compile_prog (parse_string str))
+
+(* compile program test *)
+let test_cases4 () =
+  let prog0 = "(:main (:main 0 0 (rdi <- 5) (call print 1) (return)))" 
+  and prog1 = "(:main (:main 0 0 (rdi <- 1) ((mem rsp -8) <- :f_ret) (call :f 1) :f_ret (return))\
+               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- 3) ((mem rsp 16) <- 5) (return)))" 
+  and prog2 = "(:go \
+               (:go 0 0 (rdi <- 301) ; rdi is first arg,\n \
+               (rsi <- 101) ; rsi is the second arg,\n \
+               (call allocate 2) \
+               (rdi <- rax) ; rax is the result \n\
+               (call print 1) \
+               (return)))"
+  in
+  test4 prog0;
+  test4 prog1;
+  test4 prog2
+;;
+
+(*
 let () =
-  test_cases3 ()
+  test_cases4 () *)
