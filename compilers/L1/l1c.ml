@@ -28,6 +28,8 @@ type l1 = Mem of l1 * l1
         | Label of string
         | Number of int
 
+let compose f g x = f (g x)
+
 (* string -> string *)
 let eightbit_reg_map = function
     "r10" -> "r10b"
@@ -75,7 +77,7 @@ let is_integer s =
   try ignore(int_of_string s); true with Failure _ -> false;;
 
 let is_aop = function
-    "=+=" | "-=" | "*=" | "&=" -> true
+    "+=" | "-=" | "*=" | "&=" -> true
   | _ -> false
 
 let is_sop = function
@@ -106,7 +108,6 @@ let is_u s = is_w s || is_label s;;
 let is_t s = is_x s || is_integer s;;
 let is_s s = is_x s || is_integer s || is_label s;;
 
-
 (* to get list of l1 *)
 let parse_func_sexpr = function
   | Expr sexps ->
@@ -122,7 +123,7 @@ let parse_func_sexpr = function
           | Expr (Atom "mem" :: reg :: off :: []) -> Mem (parse_inst_sexpr reg, parse_inst_sexpr off)
           | Expr (dst :: Atom "<-" :: src :: []) ->
             Mov (parse_inst_sexpr src, parse_inst_sexpr dst)
-          | Expr (w :: Atom aop :: t ::[]) when is_aop aop ->
+          | Expr (w :: Atom aop :: t :: []) when is_aop aop ->
             begin match aop with
               | "+=" -> Add (parse_inst_sexpr t, parse_inst_sexpr w)
               | "-=" -> Sub (parse_inst_sexpr t, parse_inst_sexpr w)
@@ -150,14 +151,14 @@ let parse_func_sexpr = function
           | Expr (Atom "tail-call" :: (Atom ustr as u) :: (Atom nstr as n) :: [])
             when ((is_u ustr) && (is_integer nstr)) ->
             Tail_call (parse_inst_sexpr u, parse_inst_sexpr n, args, spills)
-          | _ -> failwith (Printf.sprintf "l1c error: s-expr syntax error\n %s" (string_of_sexpr_indent sexps))
+          | _ as se -> failwith (Printf.sprintf "l1c error: s-expr syntax error\n %s" (string_of_sexpr (se::[])))
         in
         (Label labl) :: (Number args) ::
-        (Number spills) :: List.map parse_inst_sexpr rest
+        (Number spills) :: (List.map parse_inst_sexpr rest)
       (* accept only valid function*)
-      | _ -> failwith "l1c error: not a valid function"
+      | _ -> failwith "l1c error: parse_func_sexpr: not a valid function"
     end
-  | _ -> failwith "l1c error: not a valid function"
+  | _ -> failwith "l1c error: parse_func_sexpr: not a valid function"
 
 (*
 let compile_prog =
@@ -173,7 +174,7 @@ let rec compile_rnlm = function
   | _ -> failwith "l1c error: not a reg, number, lablel"
 
 (* l1 instruciton -> x64 string *)
-let compile_l1 = function 
+let compile_l1 = function
   | Label s -> "_" ^ String.sub s 1 ((String.length s) - 1) ^ ":" (*this case should only work for when inst is lb*)
 (*| Reg reg -> "%" ^ reg
   | Number num -> "$" ^ string_of_int num 
@@ -255,7 +256,7 @@ let compile_func = function
     let inst1 = "subq $" ^ string_of_int (spills * 8) ^ ", %rsp" in
     (* allocate spill when function are defined *)
     (inst0 ^ inst1) :: List.map compile_l1 rest
-  | _ -> failwith "l1c error: not a valid function"
+  | _ -> failwith "l1c error: not a valid form of valid l1 list function in compile_func"
 
 let compile_prog = function
   | Expr (Atom lb :: fun_lst) when is_label lb ->
@@ -272,7 +273,6 @@ let compile = function
   | hd :: [] -> compile_prog hd (* one file one program only *)
   | _ -> failwith "l1c error: not a valid program structure \
                    this file containnig more than one program"
-let compose f g x = f (g x)
 
 let output_file clst file =
   let oc = open_out file in
@@ -280,13 +280,6 @@ let output_file clst file =
   List.iter prog_out clst;
   close_out oc
 ;;
-
-
-let () =
-  let len = Array.length Sys.argv in
-  match len with
-  | 2 -> output_file (compile (parse_file Sys.argv.(1))) "prog.S"
-  | _ -> failwith "l1c error: no input files"
 
 let test_cases1 () =
   let inst0 = Mov ((Mem ((Reg "rsp"), (Number (-8)))), (Reg "r10b"))
@@ -382,9 +375,9 @@ let test4 str =
 
 (* compile program test *)
 let test_cases4 () =
-  let prog0 = "(:main (:main 0 0 (rdi <- 5) (call print 1) (return)))" 
+  let prog0 = "(:main (:main 0 0 (rdi <- 5) (call print 1) (rax += 1) (return)))"
   and prog1 = "(:main (:main 0 0 (rdi <- 1) ((mem rsp -8) <- :f_ret) (call :f 1) :f_ret (return))\
-               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- 3) ((mem rsp 16) <- 5) (return)))" 
+               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- 3) ((mem rsp 16) <- 5) (return)))"
   and prog2 = "(:go \
                (:go 0 0 (rdi <- 301) ; rdi is first arg,\n \
                (rsi <- 101) ; rsi is the second arg,\n \
@@ -392,12 +385,45 @@ let test_cases4 () =
                (rdi <- rax) ; rax is the result \n\
                (call print 1) \
                (return)))"
+  and prog3 = "(:main\
+                 (:main 0 0\
+                 (rdi <- 1)\
+                 (rsi <- 2)\
+                 (rdx <- 3)\
+                 (rcx <- 4)\
+                 (r8 <- 5)\
+                 (r9 <- 6)\
+                 ((mem rsp -8) <- :add_ret)\
+                 (call :add_6args 6)\
+                 :add_ret\
+                 (rax <<= 1)\
+                 (rax += 1)\
+                 (rdi <- rax)\
+                 (call print 1)\
+                 (return))\
+                 (:add_6args 6 0\
+                 (rax <- 0)\
+                 (rax += rdi)\
+                 (rax += rsi)\
+                 (rax += rdx)\
+                 (rax += rcx)\
+                 (rax += r8)\
+                 (rax += r9)\
+                 (return)))"
   in
   test4 prog0;
   test4 prog1;
-  test4 prog2
+  test4 prog2;
+  test4 prog3;
 ;;
 
-(*
+let run_test () =
+  test_cases4 ()
+
+
 let () =
-  test_cases4 () *)
+  let len = Array.length Sys.argv in
+  match len with
+  | 2 -> output_file (compile (parse_file Sys.argv.(1))) "prog.S"
+  | _ -> run_test ()
+
