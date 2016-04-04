@@ -134,8 +134,8 @@ let parse_func_sexpr = function
           | Expr (w :: Atom sop :: t :: []) when is_sop sop ->
             (* assumee w and t are all syntacticly valid for convience *)
             begin match sop with
-              | "<<=" -> Lshift (parse_inst_sexpr w, parse_inst_sexpr t)
-              | ">>=" -> Rshift (parse_inst_sexpr w, parse_inst_sexpr t)
+              | "<<=" -> Lshift (parse_inst_sexpr t, parse_inst_sexpr w)
+              | ">>=" -> Rshift (parse_inst_sexpr t, parse_inst_sexpr w)
               | _ -> failwith "l1c error: internal error: compiler should never get here"
             end
           | Expr (w :: Atom "<-" :: t0 :: Atom cmp :: t1 :: []) when is_cmp cmp ->
