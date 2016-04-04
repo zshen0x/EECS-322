@@ -207,7 +207,7 @@ let compile_l1 = function
               | _ -> set_map, "cmpq " ^ compile_rnlm rhs ^ ", " ^ compile_rnlm lhs ^ "\n"
             in
             let inst2 = set_inst_map op ^ " %" ^ eightbit_reg ^ "\n" in
-            let inst3 = "movzbq " ^ " %" ^ eightbit_reg ^ " %" ^ reg in
+            let inst3 = "movzbq " ^ " %" ^ eightbit_reg ^ ", %" ^ reg in
             inst1 ^ inst2 ^ inst3
           | _ -> failwith "l1c error: cmp dst are supposed to be a resgister"
         end
