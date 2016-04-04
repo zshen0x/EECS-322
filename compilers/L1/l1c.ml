@@ -276,7 +276,7 @@ let compose f g x = f (g x)
 
 let output_file clst file =
   let oc = open_out file in
-  let prog_out = compose (output_string oc) (String.concat "\n") in
+  let prog_out = compose (output_string oc) (compose (Printf.sprintf "%s\n") (String.concat "\n")) in
   List.iter prog_out clst;
   close_out oc
 ;;
