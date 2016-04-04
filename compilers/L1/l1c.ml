@@ -185,10 +185,10 @@ let compile_l1 = function
   | Sub (lhs, rhs) -> "subq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
   | Mul (lhs, rhs) -> "imulq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
   | And (lhs, rhs) -> "andq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
-  | Lshift (Reg reg, rhs) -> "sqlq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
-  | Lshift (lhs, rhs) -> "sqlq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
-  | Rshift (Reg reg, rhs) -> "sqrq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
-  | Rshift (lhs, rhs) -> "sqrq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Lshift (Reg reg, rhs) -> "salq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
+  | Lshift (lhs, rhs) -> "salq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
+  | Rshift (Reg reg, rhs) -> "sarq " ^ "%" ^ eightbit_reg_map reg ^ ", " ^ compile_rnlm rhs
+  | Rshift (lhs, rhs) -> "sarq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs
   | Cmp (dst, lhs, op, rhs) ->
     begin match lhs, rhs with
       | (Number l), (Number r) ->
