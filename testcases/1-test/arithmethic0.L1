@@ -1,0 +1,12 @@
+(:main
+  (:main
+   0 0
+   (rdi <- 2)
+   (rdi += rdi)
+   (rdi *= rdi)
+   (rdi &= rdi)
+   (rdi -= rdi)
+   (rdi <<= 1)
+   (rdi += 1)
+   (call print 1)
+   (return)))

@@ -1,0 +1,19 @@
+(:go
+  (:go 
+    0 0
+    (rdi <- 101)
+    (tail-call :nat_series 1)
+    (return))
+  (:nat_series
+    1 1
+    (cjump 0 < rdi :more :done)
+    :more
+    ((mem rsp 0) <- rdi)
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (rdi <- (mem rsp 0))
+    (rdi -= 1)
+    (tail-call :nat_series 1)
+    :done
+    (return)))

@@ -1,0 +1,29 @@
+(:main
+  (:main 
+   0 2
+   (rdi <- 5)
+   (rsi <- 7)
+   (call allocate 2)
+   (rdi <- (mem rax 0))
+   (rdi <- 5)
+   (rsi <- rax)
+   (call allocate 2)
+   (rdi <- 7)
+   (rsi <- rax)
+   (call allocate 2)
+   ((mem rsp 8) <- r13)
+   (r13 <- rax)
+   (rdi <- rax)
+   (call print 1)
+   (rdi <- 7)
+   (rsi <- 9)
+   (call allocate 2)
+   (rdi <- (mem rax 0))
+   (rsi <- rax)
+   (call allocate 2)
+   ((mem r13 8) <- rax) ;; change first element
+   (rdi <- r13)
+   (call print 1)
+   (r13 <- (mem rsp 8))
+   (return)))
+

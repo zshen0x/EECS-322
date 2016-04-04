@@ -1,0 +1,18 @@
+(:main
+  (:main
+    0 0
+    (rdi <- 21)
+    (rsi <- 21)
+    ((mem rsp -8) <- :output)
+    (call :calc_area 2)
+    :output
+    (rdi <- rax)
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (return))
+  (:calc_area
+    2 0
+    (rdi *= rsi)
+    (rax <- rdi)
+    (return)))

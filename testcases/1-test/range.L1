@@ -1,0 +1,48 @@
+(:main
+  (:main
+   0 0
+   (rdi <- 1)
+   (rsi <- 100)
+   ((mem rsp -8) <- :range1_100_print)
+   (call :range 2)
+   :range1_100_print
+   (rdi <- rax)
+   (call print 1)
+   (rdi <- 99)
+   (rsi <- 100)
+   ((mem rsp -8) <- :range99_100_print)
+   (call :range 2)
+   :range99_100_print
+   (rdi <- rax)
+   (call print 1)
+   (return)) 
+
+  (:range
+    2 2
+    ((mem rsp 0) <- rdi)
+    ((mem rsp 8) <- rsi)
+    (rsi -= rdi)
+    (rdi <- rsi)
+    (rdi <<= 1)           ;; encode
+    (rdi += 1)
+    (rsi <- 1)
+    (call allocate 2)
+    (rdx <- rax)
+    (rax += 8)
+    (rdi <- (mem rsp 0))   ;; fill up from start -> end
+    (rsi <- (mem rsp 8))
+    (rsi -= rdi)    
+    :loop
+    (cjump rsi <= 0 :done :more) ;; counter
+    :more
+    (rcx <- rdi)
+    (rcx <<= 1)
+    (rcx += 1)
+    ((mem rax 0) <- rcx)
+    (rsi -= 1)
+    (rdi += 1)
+    (rax += 8)
+    (goto :loop)
+    :done
+    (rax <- rdx)
+    (return)))

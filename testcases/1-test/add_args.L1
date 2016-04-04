@@ -1,0 +1,28 @@
+(:main
+  (:main
+    0 0
+    (rdi <- 1)
+    (rsi <- 2)
+    (rdx <- 3)
+    (rcx <- 4)
+    (r8 <- 5)
+    (r9 <- 6)
+    ((mem rsp -8) <- :add_ret)
+    (call :add_6args 6)
+    :add_ret
+    (rax <<= 1)
+    (rax += 1)
+    (rdi <- rax)
+    (call print 1)
+    (return))
+  (:add_6args
+   6 0
+   (rax <- 0)
+   (rax += rdi)
+   (rax += rsi)
+   (rax += rdx)
+   (rax += rcx)
+   (rax += r8)
+   (rax += r9)
+   (return))
+)

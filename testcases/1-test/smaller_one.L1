@@ -1,0 +1,51 @@
+(:main
+  (:main 
+  0 0
+  ((mem rsp -8) <- :l1)
+  (rdi <- 0)
+  (rsi <- -1)
+  (call :smaller_one 2)
+  :l1
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  ((mem rsp -8) <- :l2)
+  (rdi <- 20)
+  (rsi <- 20)
+  (call :smaller_one 2)
+  :l2
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  ((mem rsp -8) <- :l3)
+  (rdi <- 123456754320891)
+  (rsi <- -192038427397)
+  (call :smaller_one 2)
+  :l3
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  ((mem rsp -8) <- :l4)
+  (rdi <- 29329384384)
+  (rsi <- 1919199992845)
+  (call :smaller_one 2)
+  :l4
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  (return))
+
+  (:smaller_one
+    2 0
+    (cjump rdi < rsi :lhs :rhs)
+    :lhs
+    (rax <- rdi)
+    (goto :end)
+    :rhs
+    (rax <- rsi)
+    :end
+    (return)))

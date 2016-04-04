@@ -1,0 +1,21 @@
+(:main 
+  (:main
+    0 0
+    (rdi <- 1)
+    (rsi <- 100)
+    (rdx <- 100)
+    ((mem rsp -8) <- :output)
+    (call :gauss_series_sum 3)
+    :output
+    (rdi <- rax)
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (return))
+  (:gauss_series_sum
+    3 0
+    (rax <- rdi)
+    (rax += rsi)
+    (rax *= rdx)
+    (rax >>= 1)
+    (return)))

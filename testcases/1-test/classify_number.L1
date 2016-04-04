@@ -1,0 +1,39 @@
+(:main
+ (:main 
+  0 0
+  (rdi <- -234)
+  ((mem rsp -8) <- :next0)
+  (call :classify_num 1)
+  :next0
+  (rdi <- 0)
+  ((mem rsp -8) <- :next1)
+  (call :classify_num 1)
+  :next1
+  (rdi <- 123495)
+  ((mem rsp -8) <- :end)
+  (call :classify_num 1)
+  :end
+  (return))
+ (:classify_num
+  1 0
+  (cjump rdi < 0 :l0 :l1)
+  :l0
+  (rdi <- 3)
+  (call print 1)
+  (return)
+  :l1
+  (cjump rdi < 10 :l2 :l3)
+  :l2
+  (rdi <- 5)
+  (call print 1)
+  (return)
+  :l3
+  (cjump rdi < 20 :l4 :l5)
+  :l4
+  (rdi <- 7)
+  (call print 1)
+  (return)
+  :l5
+  (rdi <- 9)
+  (call print 1)
+  (return)))

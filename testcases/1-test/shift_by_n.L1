@@ -1,0 +1,30 @@
+(:main
+  (:main
+    0 0
+    (rdi <- 12345)
+    (rsi <- 10)
+    ((mem rsp -8) <- :rshift)
+    (call :lshift_by_n 2)
+    :rshift
+    (rdi <- rax)
+    (rsi <- 10)
+    ((mem rsp -8) <- :output)
+    (call :rshift_by_n 2)
+    :output
+    (rdi <- rax)
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (return))
+  (:lshift_by_n
+    2 0
+    (rcx <- rsi)
+    (rdi <<= rcx)
+    (rax <- rdi)
+    (return))
+  (:rshift_by_n
+    2 0
+    (rcx <- rsi)
+    (rdi >>= rcx)
+    (rax <- rdi)
+    (return)))

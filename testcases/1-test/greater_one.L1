@@ -1,0 +1,33 @@
+(:main
+  (:main 
+  0 0
+  ((mem rsp -8) <- :l1)
+  (rdi <- 1)
+  (rsi <- 200)
+  (call :greater_one 2)
+  :l1
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  ((mem rsp -8) <- :l2)
+  (rdi <- 20)
+  (rsi <- 20)
+  (call :greater_one 2)
+  :l2
+  (rdi <- rax)
+  (rdi <<= 1)
+  (rdi += 1)
+  (call print 1)
+  (return))
+
+  (:greater_one
+    2 0
+    (cjump rdi < rsi :lhs :rhs)
+    :lhs
+    (rax <- rsi)
+    (goto :end)
+    :rhs
+    (rax <- rdi)
+    :end
+    (return)))

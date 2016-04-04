@@ -1,0 +1,35 @@
+(:main
+ (:main
+   0 0
+   (rdi <- 2)
+   (rsi <- 2)
+   (rdx <- 2)
+   ((mem rsp -8) <- :l0)
+   (call :isequaltriangle 3)
+   :l0
+   (rdi <- rax)
+   (rdi <<= 1)
+   (rdi += 1)
+   (call print 1)
+   ;;
+   (rdi <- 1)
+   (rsi <- 2)
+   (rdx <- 3)
+   ((mem rsp -8) <- :l1)
+   (call :isequaltriangle 3)
+   :l1 
+   (rdi <- rax)
+   (rdi <<= 1)
+   (rdi += 1)
+   (call print 1)
+   (return))
+ (:isequaltriangle
+   3 0
+   (rax <- 0)
+   (cjump rdi = rsi :more1 :done)
+   :more1
+   (cjump rsi = rdx :more2 :done)
+   :more2
+   (rax <- 1)
+   :done
+   (return)))

@@ -1,0 +1,26 @@
+(:main
+  (:main
+    0 0
+    ((mem rsp -8) <- :next0)
+    (rdi <- 0)
+    (call :tailcall 1)
+    :next0
+    ((mem rsp -8) <- :next1)
+    (rdi <- 100)
+    (call :tailcall 1)
+    :next1
+    (rdi <- -1923)
+    (tail-call :tailcall 1)
+    (return))
+  (:tailcall
+    1 0
+    (cjump rdi <= 0 :done :more)
+    :done
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (return)
+    :more
+    (rdi -= 1)
+    (tail-call :tailcall 1)
+    (return)))

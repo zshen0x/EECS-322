@@ -1,0 +1,42 @@
+(:main
+  (:main
+    0 0
+    (rdi <- 10)
+    (rsi <- 0)
+    ((mem rsp -8) <- :next1)
+    (call :triangle 2)
+    :next1
+    (rdi <- 1)
+    (rsi <- 1)
+    ((mem rsp -8) <- :next2)
+    (call :triangle 2)
+    :next2
+    (rdi <- 15)
+    (rsi <- 2)
+    ((mem rsp -8) <- :end)
+    (tail-call :triangle 2)
+    :end
+    (return))
+  
+  (:triangle
+    2 2
+    (cjump rdi <= 0 :done :more)
+    :done
+    (return)
+    :more
+    ((mem rsp 0) <- rdi)
+    ((mem rsp 8) <- rsi)
+    (rdi -= 1)
+    ((mem rsp -8) <- :print_one_line)
+    (call :triangle 2)
+    :print_one_line
+    (rdi <- (mem rsp 0))
+    (rsi <- (mem rsp 8))
+    (rdi <<= 1)
+    (rdi += 1)
+    (rsi <<= 1)
+    (rsi += 1)
+    (call allocate 2)
+    (rdi <- rax)
+    (call print 1)
+    (return)))

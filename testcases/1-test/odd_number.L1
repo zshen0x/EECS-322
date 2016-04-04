@@ -1,0 +1,39 @@
+(:main
+ (:main
+   0 0
+   (rdi <- 10)
+   ((mem rsp -8) <- :l1)
+   (call :odd_number 1)
+   :l1
+   ((mem rsp -8) <- :l2)
+   (rdi <- 100)
+   (call :odd_number 1)
+   :l2
+   ((mem rsp -8) <- :l3) 
+   (rdi <- -1)
+   (call :odd_number 1)
+   :l3
+   ((mem rsp -8) <- :l4) 
+   (rdi <- 8237556134)
+   (call :odd_number 1)
+   :l4
+   ((mem rsp -8) <- :l5) 
+   (rdi <- -1234567543)
+   (call :odd_number 1)
+   :l5
+   ((mem rsp -8) <- :terminate) 
+   (rdi <- 12923479)
+   (call :odd_number 1)
+   :terminate
+   (return)
+ )
+ 
+ (:odd_number
+   1 1
+   (rdi &= 1)
+   (rdi <<= 1)
+   (rdi += 1)
+   ((mem rsp 0) <- rdi)
+   (call print 1)
+   (rax <- (mem rsp 0))
+   (return)))

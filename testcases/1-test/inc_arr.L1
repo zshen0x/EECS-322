@@ -1,0 +1,34 @@
+(:main
+  (:main
+    0 1
+    (rdi <- 41)
+    (rsi <- 1)
+    (call allocate 2)
+    ((mem rsp 0) <- rax)
+    (rdi <- rax)
+    (call print 1)
+    (rdi <- (mem rsp 0))
+    (rsi <- 3)
+    ((mem rsp -8) <- :next)
+    (call :inc_arr 2)
+    :next
+    (rdi <- rax)
+    (call print 1)
+    (return))
+  (:inc_arr
+    2 0
+    (rax <- rdi)
+    (r8 <- (mem rdi 0))
+    (rdi += 8)
+    (rsi <<= 1)
+    :loop
+    (cjump 0 < r8 :more :done)
+    :more
+    (rcx <- (mem rdi 0))
+    (rcx += rsi)
+    ((mem rdi 0) <- rcx)
+    (rdi += 8)
+    (r8 -= 1)
+    (goto :loop)
+    :done
+    (return)))

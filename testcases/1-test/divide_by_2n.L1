@@ -1,0 +1,22 @@
+(:main
+  (:main
+    0 0
+    (rdi <- 3)
+    (rsi <- 1)
+    ((mem rsp -8) <- :next1)
+    (call :divide_by_2n 2)
+    :next1
+    (rdi <- 12345431)
+    (rsi <- 12)
+    ((mem rsp -8) <- :end)
+    (call :divide_by_2n 2)
+    :end
+    (return))
+  (:divide_by_2n
+    2 0
+    (rcx <- rsi)
+    (rdi >>= rcx)
+    (rdi <<= 1)
+    (rdi += 1)
+    (call print 1)
+    (return)))
