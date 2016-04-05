@@ -1,5 +1,6 @@
 open SExpr;;
 open Str;;
+open Int64;;
 
 (*
 type aop = Add | Sub | Mul | Antype sop = Lshift | Rshift
@@ -19,14 +20,14 @@ type l1 = Mem of l1 * l1
         | Goto of l1
         | Cjmp of l1 * string * l1 * l1 * l1
         | Call of l1 * l1
-        | Tail_call of l1 * l1 * int * int (* callee function args and spillls *)
-        | Return of int * int
+        | Tail_call of l1 * l1 * int64 * int64 (* callee function args and spillls *)
+        | Return of int64 * int64
         | Print
         | Allocate
         | ArrayError
         | Reg of string
         | Label of string
-        | Number of int
+        | Number of int64
 
 let compose f g x = f (g x)
 
@@ -74,7 +75,7 @@ let condjmp_map = function
   | _ as s -> failwith (Printf.sprintf "l1c error: %s not a valid operator" s)
 
 let is_integer s =
-  try ignore(int_of_string s); true with Failure _ -> false;;
+  try ignore(Int64.of_string s); true with Failure _ -> false;;
 
 let is_aop = function
     "+=" | "-=" | "*=" | "&=" -> true
@@ -114,10 +115,10 @@ let parse_func_sexpr = function
     begin match sexps with
       | (Atom labl) :: (Atom args) :: (Atom spills) :: rest
         when ((is_integer args) && (is_integer spills)) ->
-        let args, spills = int_of_string args, int_of_string spills in
+        let args, spills = Int64.of_string args, Int64.of_string spills in
         let rec parse_inst_sexpr = function
           | Atom lb when is_label lb -> Label lb
-          | Atom n when is_integer n -> Number (int_of_string n)
+          | Atom n when is_integer n -> Number (of_string n)
           | Atom r when is_x r -> Reg r
           | Expr (Atom "return" :: []) -> Return (args, spills)
           | Expr (Atom "mem" :: reg :: off :: []) -> Mem (parse_inst_sexpr reg, parse_inst_sexpr off)
@@ -146,6 +147,7 @@ let parse_func_sexpr = function
                   parse_inst_sexpr lb0, parse_inst_sexpr lb1)
           | Expr (Atom "call" :: Atom "print" :: Atom "1" :: []) -> Print
           | Expr (Atom "call" :: Atom "allocate" :: Atom "2" :: []) -> Allocate
+          | Expr (Atom "call" :: Atom "array-error" :: Atom "2" :: []) -> ArrayError
           | Expr (Atom "call" :: (Atom ustr as u) :: (Atom nstr as n) :: [])
             when ((is_u ustr) && (is_integer nstr)) -> Call (parse_inst_sexpr u, parse_inst_sexpr n)
           | Expr (Atom "tail-call" :: (Atom ustr as u) :: (Atom nstr as n) :: [])
@@ -169,8 +171,8 @@ let compile_prog =
 let rec compile_rnlm = function
   | Label s -> "_" ^ String.sub s 1 ((String.length s) - 1)
   | Reg reg -> "%" ^ reg
-  | Number num -> "$" ^ string_of_int num
-  | Mem (reg, Number off) -> string_of_int off ^ "(" ^ compile_rnlm reg ^ ")"
+  | Number num -> "$" ^ Int64.to_string num
+  | Mem (reg, Number off) -> Int64.to_string off ^ "(" ^ compile_rnlm reg ^ ")"
   | _ -> failwith "l1c error: not a reg, number, lablel"
 
 (* l1 instruciton -> x64 string *)
@@ -221,7 +223,7 @@ let compile_l1 = function
           | "=" -> (=)
           | _ -> failwith (Printf.sprintf "l1c error: cjump invalid opeartor %s" op)
         in
-        "jmp " ^ if cmpare l r then compile_rnlm labl0 else compile_rnlm labl0
+        "jmp " ^ if cmpare l r then compile_rnlm labl0 else compile_rnlm labl1
       | _ ->
         let condjmp_inst_map, inst1 = match lhs with
           | Number l -> adjcondjmp_map, "cmpq " ^ compile_rnlm lhs ^ ", " ^ compile_rnlm rhs ^ "\n"
@@ -234,26 +236,31 @@ let compile_l1 = function
     end
   | Goto lb -> "jmp " ^ compile_rnlm lb
   | Call (labl, Number n) ->
-    "subq $" ^ string_of_int (((if n > 6 then n - 6 else 0) + 1) * 8) ^ ", %rsp\n"
+    "subq $" ^ string_of_int (((if (Int64.to_int n) > 6 then (Int64.to_int n) - 6 else 0) + 1) * 8)
+    ^ ", %rsp\n"
     ^ "jmp " ^ compile_rnlm labl
       (* do argument space allocate and pass val only when call via move rsp*)
   | Tail_call (labl, my_args, callee_args, spills) ->
-    "addq $" ^ string_of_int (((if callee_args > 6 then callee_args - 6 else 0) + spills) * 8) ^ ", %rsp\n"
+    "addq $"
+    ^ string_of_int (((if (Int64.to_int callee_args) > 6 then (Int64.to_int callee_args) - 6 else 0) + Int64.to_int spills) * 8)
+    ^ ", %rsp\n"
     ^ "jmp " ^ compile_rnlm labl
       (* "function can only be called at tail position when they have 6 or fewer args so not args in stack "*)
   | Print -> "call print"
   | Allocate -> "call allocate"
   | ArrayError -> "call array_error"
-  | Return (args, spills) -> "addq $"
-                          ^ string_of_int (((if args > 6 then args - 6 else 0) + spills) * 8)
-                          ^ ", %rsp\n" ^ "ret"
+  | Return (args, spills) ->
+    "addq $"
+    ^ string_of_int (((if (Int64.to_int args) > 6 then (Int64.to_int args) - 6 else 0) + Int64.to_int spills) * 8)
+    ^ ", %rsp\n"
+    ^ "ret"
   | _ -> failwith "l1c error: failed to matching instruction"
 
 (* function in l1 -> list of instructions in x64*)
 let compile_func = function
   | (Label lb as l1labl) :: Number args :: Number spills :: rest ->
     let inst0 = compile_l1 l1labl ^ "\n" in
-    let inst1 = "subq $" ^ string_of_int (spills * 8) ^ ", %rsp" in
+    let inst1 = "subq $" ^ Int64.to_string (Int64.mul spills (Int64.of_int 8)) ^ ", %rsp" in
     (* allocate spill when function are defined *)
     (inst0 ^ inst1) :: List.map compile_l1 rest
   | _ -> failwith "l1c error: not a valid form of valid l1 list function in compile_func"
@@ -282,29 +289,32 @@ let output_file clst file =
 ;;
 
 let test_cases1 () =
-  let inst0 = Mov ((Mem ((Reg "rsp"), (Number (-8)))), (Reg "r10b"))
+  let inst0 = Mov ((Mem ((Reg "rsp"), (Number (Int64.of_int (-8))))), (Reg "r10b"))
   and inst1 = Goto (Label":next")
-  and inst2 = Mov ((Number 10), (Reg "r10"))
-  and inst3 = Mov ((Reg "rcx"), Mem ((Reg "r8"), (Number (16))))
+  and inst2 = Mov ((Number (Int64.of_int 10)), (Reg "r10"))
+  and inst3 = Mov ((Reg "rcx"), Mem ((Reg "r8"), (Number (Int64.of_int 16))))
   and inst4 = Label ":go"
   and inst5 = Label ":main"
   and inst6 = Print
   and inst7 = Allocate
   and inst8 = ArrayError
-  and inst9 = Return (2, 4)
+  and inst9 = Return ((Int64.of_int 2), (Int64.of_int 4))
   and inst10 = Add ((Reg "r11"), (Reg "rbp"))
   and inst11 = Sub ((Reg "r11"), (Reg "r15"))
-  and inst12 = Mul ((Reg "r9"), (Number 10))
+  and inst12 = Mul ((Reg "r9"), (Number (Int64.of_int 10)))
   and inst13 = Lshift ((Reg "rcx"), (Reg "rdi"))
-  and inst14 = Lshift ((Number 1), (Reg "r9"))
+  and inst14 = Lshift ((Number (Int64.of_int 1)), (Reg "r9"))
   and inst15 = Rshift ((Reg "rax"), (Reg "rsi"))
-  and inst16 = Rshift ((Number 3), (Reg "r8"))
-  and inst17 = Cmp ((Reg "rdi"), (Number 10), "<=", (Reg "rax"))
-  and inst18 = Cmp ((Reg "rsi"), (Number 10), "<=", (Number 20))
-  and inst19 = Cmp ((Reg "rax"), (Number 12), "<=", (Number 11))
-  and inst20 = Cmp ((Reg "rbx"), (Reg "rax"), "<=", (Number 20))
-  and inst21 = Cjmp ((Reg "rax"), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
-  and inst22 = Cjmp ((Number (-2)), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
+  and inst16 = Rshift ((Number (Int64.of_int 3)), (Reg "r8"))
+  and inst17 = Cmp ((Reg "rdi"), (Number (Int64.of_int 10)), "<=", (Reg "rax"))
+  and inst18 = Cmp ((Reg "rsi"), (Number (Int64.of_int 10)), "<=", (Number (Int64.of_int 20)))
+  and inst19 = Cmp ((Reg "rsi"), (Number (Int64.of_int 20)), "<=", (Number (Int64.of_int 30)))
+  and inst20 = Cmp ((Reg "rax"), (Number (Int64.of_int 12)), "<=", (Number (Int64.of_int 11)))
+  and inst21 = Cmp ((Reg "rbx"), (Reg "rax"), "<=", (Number (Int64.of_int 20)))
+  and inst22 = Cjmp ((Reg "rax"), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
+  and inst23 = Cjmp ((Number (Int64.of_int (-2))), "<=", (Reg "rdi"), (Label ":yes"), (Label ":no"))
+  and inst24 = Cjmp ((Number (Int64.of_int (-2))), "<=", (Number (Int64.of_int (-10))), (Label ":yes"), (Label ":no"))
+  and inst25 = Cjmp ((Number (Int64.of_int (-11))), "<", (Number (Int64.of_int (-10))), (Label ":yes"), (Label ":no"))
   in
   print_newline (print_string (compile_l1 inst0));
   print_newline (print_string (compile_l1 inst1));
@@ -329,18 +339,21 @@ let test_cases1 () =
   print_newline (print_string (compile_l1 inst20));
   print_newline (print_string (compile_l1 inst21));
   print_newline (print_string (compile_l1 inst22));
+  print_newline (print_string (compile_l1 inst23));
+  print_newline (print_string (compile_l1 inst24));
+  print_newline (print_string (compile_l1 inst25));
 ;;
 
 let test_cases2 () =
-  let inst0 = Return (9, 3)
-  and inst1 = Call (Label ":anthortherfunction", Number 11)
-  and inst2 = Call (Label ":hello_world1", Number 6)
-  and inst3 = Call (Label ":hello_world2", Number 0)
-  and inst4 = Call (Label ":hello_world3", Number 20)
-  and inst5 = Tail_call (Label ":tailfunction", Number 3, 0, 0)
-  and inst6 = Tail_call (Label "tailfunction2", Number 0, 0, 2)
-  and inst7 = Tail_call (Label "tailfunction3", Number 6, 7, 2)
-  and inst8 = Tail_call (Label "tailfunction4", Number 5, 11, 3)
+  let inst0 = Return ((Int64.of_int 9), (Int64.of_int 3))
+  and inst1 = Call (Label ":anthortherfunction", Number (Int64.of_int 11))
+  and inst2 = Call (Label ":hello_world1", Number (Int64.of_int 6))
+  and inst3 = Call (Label ":hello_world2", Number (Int64.of_int 6))
+  and inst4 = Call (Label ":hello_world3", Number (Int64.of_int 20))
+  and inst5 = Tail_call (Label ":tailfunction", Number (Int64.of_int 3), (Int64.of_int 0), (Int64.of_int 4))
+  and inst6 = Tail_call (Label "tailfunction2", Number (Int64.of_int 0), (Int64.of_int 9), (Int64.of_int 0))
+  and inst7 = Tail_call (Label "tailfunction3", Number (Int64.of_int 6), (Int64.of_int 2), (Int64.of_int 4))
+  and inst8 = Tail_call (Label "tailfunction4", Number (Int64.of_int 6), (Int64.of_int 1), (Int64.of_int 3))
   in
   print_newline (print_string (compile_l1 inst0));
   print_newline (print_string (compile_l1 inst1));
@@ -375,9 +388,10 @@ let test4 str =
 
 (* compile program test *)
 let test_cases4 () =
-  let prog0 = "(:main (:main 0 0 (rdi <- 5) (call print 1) (rax += 1) (return)))"
+  let prog0 = "(:main (:main 0 0 (rdi <- 5) (call print 1) (rax += 9223372036854775807) (return)))"
   and prog1 = "(:main (:main 0 0 (rdi <- 1) ((mem rsp -8) <- :f_ret) (call :f 1) :f_ret (return))\
-               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- 3) ((mem rsp 16) <- 5) (return)))"
+               (:f 1 3 ((mem rsp 0) <- rdi) (rax <- (mem rsp 0)) ((mem rsp 8) <- -9223372036854775808) \
+               ((mem rsp 16) <- 5) (return)))"
   and prog2 = "(:go \
                (:go 0 0 (rdi <- 301) ; rdi is first arg,\n \
                (rsi <- 101) ; rsi is the second arg,\n \
@@ -418,7 +432,7 @@ let test_cases4 () =
 ;;
 
 let run_test () =
-  test_cases4 ()
+  test_cases1 ()
 
 
 let () =
@@ -426,4 +440,3 @@ let () =
   match len with
   | 2 -> output_file (compile (parse_file Sys.argv.(1))) "prog.S"
   | _ -> run_test ()
-

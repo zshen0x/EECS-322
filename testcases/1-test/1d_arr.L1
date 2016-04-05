@@ -1,8 +1,8 @@
 (:go 
  (:go
   0 0
-  (rdi <- 301) ; rdi is first arg,
-  (rsi <- 101) ; rsi is the second arg, 
+  (rdi <- 2) ; rdi is first arg,
+  (rsi <- 922349494949994949) ; rsi is the second arg, 
   (call allocate 2)
   (rdi <- rax) ; rax is the result 
   (call print 1)
