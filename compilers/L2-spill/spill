@@ -1,0 +1,4 @@
+#!/bin/sh
+
+racket $(dirname $0)/spill-format.rkt "$@" | ./spill.native
+

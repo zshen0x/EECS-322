@@ -44,7 +44,7 @@ let is_t s = is_x s || is_integer s;;
 let is_s s = is_x s || is_integer s || is_label s;;
 
 
-(* f : list sexpr, var : string, prefix : string *)
+(* f : sexpr list, var : string, prefix : string *)
 let spill_in_function f var prefix =
   begin match f with
   | l :: ag :: Atom spills :: rest ->
@@ -69,14 +69,6 @@ let spill_in_function f var prefix =
         incr counter;
         Expr [Atom var_after_spill; Atom "<-"; mem_acc] ::
         Expr [Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]; Atom "<-"; Atom var_after_spill] :: []
-      (*
-      | Expr [Atom w; Atom "<-"; Expr [Atom "stack-args"; Atom n8] as stack_acc] when is_var_to_spill w ->
-        let suffix = string_of_int !counter in
-        let var_after_spill = prefix ^ suffix in
-        incr counter;
-        Expr [Atom var_after_spill; Atom "<-"; stack_acc] ::
-        Expr [Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]; Atom "<-"; Atom var_after_spill] :: []
-      *)
       | Expr [Expr [(Atom "mem"); Atom x; Atom n8] as mem; Atom "<-"; Atom s] when is_var_to_spill s ->
         let suffix = string_of_int !counter in
         let var_after_spill = prefix ^ suffix in
@@ -115,26 +107,19 @@ let spill_in_function f var prefix =
           incr counter;
           let mread = Expr [Atom var_after_spill; Atom "<-"; Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]]
           and mwrite = Expr [Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]; Atom "<-"; Atom var_after_spill]
+          and cmp_inst = Expr [Atom var_after_spill;
+                                   Atom "<-";
+                                   if is_var_to_spill t1 then Atom var_after_spill else Atom t1;
+                                   Atom cmp;
+                                   if is_var_to_spill t2 then Atom var_after_spill else Atom t2]
           in
           if is_var_to_spill w then
-            let tmp = Expr [Atom var_after_spill;
-                            Atom "<-";
-                            if is_var_to_spill t1 then Atom var_after_spill else Atom t1;
-                            if is_var_to_spill t2 then Atom var_after_spill else Atom t2
-                           ] ::
-                      mwrite :: []
-            in
             if is_var_to_spill t1 || is_var_to_spill t2 then
-              mread :: tmp
+              mread :: cmp_inst :: mwrite :: []
             else
-              tmp
+              cmp_inst :: mwrite :: []
           else
-            mread ::
-            Expr [Atom var_after_spill;
-                  Atom "<-";
-                  if is_var_to_spill t1 then Atom var_after_spill else Atom t1;
-                  if is_var_to_spill t2 then Atom var_after_spill else Atom t2
-                 ] :: []
+            mread :: cmp_inst :: []
         end
         else
           [inst]
@@ -168,35 +153,41 @@ let spill_in_function f var prefix =
         Expr [call; Atom var_after_spill; Atom nat] :: []
       | _ as inst -> [inst]
                      (* assume no invalid input here*)
-        (*
-        begin match inst with
-        | Expr (Atom "return" :: []) -> inst :: []
-        | Atom labl when (is_label labl) -> inst :: []
-        | Expr (Atom "goto" :: Atom labl :: []) when (is_label labl) -> inst :: []
-        | Expr (Atom "call" :: Atom "print" :: Atom "1" :: []) -> inst :: []
-        | Expr (Atom "call" :: Atom func :: Atom "2" :: [])
-          when (func = "allocate" || func = "array-error") -> inst :: []
-        | _ -> failwith (Printf.sprintf "unable to spill instruction:\n %s" (string_of_sexpr (inst::[])))
-        end
-        *)
     in
     l :: ag :: Atom (string_of_int (spills + 1))
     :: List.fold_left List.append [] (List.map spill_instruction rest)
   | _ -> failwith "l2-spill: error: not a valid function"
   end
 
+
+let spill func_sexpr var prefix =
+  match func_sexpr with
+  | Expr f -> Expr (spill_in_function f var prefix)
+  | _ -> failwith "l2-spill: error: not a valid function s-expr"
+
+
 let test0 () =
-  let func0 = "(:f 0 0 (k <- 0) (rax <- 0) (rbx <- 1) (rax += k))"
+  let func0 = "(:f 
+  8 0
+  (x <- rdi)
+  (y <- (stack-arg 0))
+  (z <- (stack-arg 8))
+  (a <- 3)
+  (a += x)
+  (a += y)
+  (a += z))"
   in
   match (List.hd (parse_string func0)) with
-  | Expr fl -> print_sexpr (spill_in_function fl "k" "p_")
+  | Expr fl -> print_sexpr (spill_in_function fl "a" "s")
   | _ -> failwith "test0: invalid input"
 
 let run_tests () =
   test0 ()
 
 let () =
-  let len = Array.length Sys.argv in
-  match len with
-  | 2
-  | _ -> run_tests ()
+      let func = read_line () in
+      let var = read_line () in
+      let prefix = read_line () in
+      match parse_string func with
+      | [func_lst] -> print_sexpr [spill func_lst var prefix]
+      | _ -> failwith "spill_reader: error: not a valid "

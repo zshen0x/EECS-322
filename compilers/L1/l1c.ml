@@ -434,7 +434,6 @@ let test_cases4 () =
 let run_test () =
   test_cases1 ()
 
-
 let () =
   let len = Array.length Sys.argv in
   match len with
