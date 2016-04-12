@@ -84,8 +84,10 @@ let spill_in_function f var prefix =
         let mwrite = Expr [Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]; Atom "<-"; Atom var_after_spill]
         in
         incr counter;
-        if is_var_to_spill w then
+        if is_var_to_spill w && is_var_to_spill x then
           mread :: assign_inst :: mwrite :: []
+        else if is_var_to_spill w then
+          assign_inst :: mwrite :: []
         else
           mread :: assign_inst :: []
       | Expr [Expr [Atom "mem"; Atom x; Atom n8] as mem; Atom "<-"; Atom s]
@@ -114,10 +116,7 @@ let spill_in_function f var prefix =
         in
         incr counter;
         if is_var_to_spill w then
-          if is_var_to_spill t then
-            mread :: op_inst :: mwrite :: []
-          else
-            op_inst :: mwrite :: []
+          mread :: op_inst :: mwrite :: []
         else
           mread :: op_inst :: []
       | Expr [Atom w; Atom "<-"; Atom t1; Atom cmp; Atom t2]
@@ -149,7 +148,9 @@ let spill_in_function f var prefix =
         let cjump_inst = Expr [Atom "cjump";
                                if is_var_to_spill t1 then Atom var_after_spill else Atom t1;
                                Atom cmp;
-                               if is_var_to_spill t2 then Atom var_after_spill else Atom t2]
+                               if is_var_to_spill t2 then Atom var_after_spill else Atom t2;
+                               label1;
+                               label2]
         in
         incr counter;
         mread :: cjump_inst :: []
