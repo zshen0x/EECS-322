@@ -1,0 +1,7 @@
+(:g 
+  2 0 
+  (rdi += rsi) 
+  (x <- rdi)
+  (x <- x < x)
+  (call x 2)
+  (return)) x s

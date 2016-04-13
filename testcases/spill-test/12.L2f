@@ -1,0 +1,6 @@
+(:f
+  0 0
+  (x <- :go)
+  (tail-call x 5)
+  :go
+  (return)) x s

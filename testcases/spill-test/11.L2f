@@ -1,0 +1,19 @@
+(:f
+1 0
+(a <- rdi)
+(b <- rdi)
+(c <- rdi)
+(d <- rdi)
+(e <- rdi)
+(f <- rdi)
+(g <- rdi)
+(h <- rdi)
+(rax <- a)
+(rax += b)
+(rax += c)
+(rax += d)
+(rax += e)
+(rax += f)
+(rax += g)
+(rax += h)
+(return)) a a_

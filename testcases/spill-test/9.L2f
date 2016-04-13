@@ -1,0 +1,8 @@
+(:main
+  0 1
+  ((mem rsp 0) <- 1)
+  (x <- 2)
+  (z <- (mem rsp 0))
+  (x += z)
+  (rax <- z)
+  (return)) z s_

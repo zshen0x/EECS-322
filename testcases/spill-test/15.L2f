@@ -1,0 +1,7 @@
+(:go
+  0 0
+  (rdi <- 10)
+  (rsi <- 11)
+  (call array-array 2)
+  (return))
+xx s
