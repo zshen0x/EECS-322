@@ -1,0 +1,8 @@
+(:g 
+  1 0
+  (x <- 1)
+  :next
+  (rax <- rdi) 
+  (rax += x) 
+  (rax <<= x)
+  (return))

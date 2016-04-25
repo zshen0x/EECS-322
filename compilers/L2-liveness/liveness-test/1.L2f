@@ -1,0 +1,6 @@
+(:g 
+  1 2
+  (x <- 1) 
+  (rax <- rdi) 
+  (rax += x) 
+  (return))

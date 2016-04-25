@@ -1,0 +1,8 @@
+(:f 
+  0 0
+  (cjump rax < rbx :l1 :l2)
+  :l1
+  (rax <- 1)
+  :l2
+  (rax <- 0)
+  (return))

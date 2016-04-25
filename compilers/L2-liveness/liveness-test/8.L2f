@@ -1,0 +1,4 @@
+(:fun
+  1 2
+  (x <- (mem rsp 0))
+  (tail-call x 0))

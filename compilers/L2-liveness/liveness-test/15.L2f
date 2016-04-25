@@ -1,0 +1,6 @@
+(:f
+  0 0
+  (rdi <- 5)
+  (rsi <- 5)
+  (call allocate 2)
+  (return))

@@ -1,0 +1,8 @@
+((in
+ (r12 r13 r14 r15 rax rbp rax x)
+ (r12 r13 r14 r15 rax rbp rax x)
+ (r12 r13 r14 r15 rax rbp rbx))
+ (out
+ (r12 r13 r14 r15 rax rbp rax x)
+ (r12 r13 r14 r15 rax rbp rbx)
+ ()))

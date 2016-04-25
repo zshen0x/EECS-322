@@ -1,0 +1,8 @@
+(:go
+  0 0
+  (1 <- x)
+  (x += x)
+  (y <- x)
+  (goto :end)
+  :end
+  (return))

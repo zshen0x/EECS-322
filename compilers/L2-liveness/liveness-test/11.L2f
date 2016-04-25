@@ -1,0 +1,6 @@
+(:f
+  1 1
+  (x <- (stack-arg 8))
+  (rdi <- 2)
+  (call x 1)
+  (return))

@@ -1,0 +1,6 @@
+(:f
+ 1 2
+ (x <- rdi)
+ (y <- rsi)
+ (z <- (mem x 5))
+ (return))
