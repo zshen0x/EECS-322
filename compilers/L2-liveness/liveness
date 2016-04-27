@@ -1,0 +1,4 @@
+#!/bin/sh
+
+/home/software/racket-6.4/bin/racket $(dirname $0)/liveness-format.rkt "$@" | ./liveness.native
+
