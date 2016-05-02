@@ -33,19 +33,23 @@ let is_label s =
   let r = Str.regexp "^:[a-zA-Z_][a-zA-Z_0-9]*$" in
   Str.string_match r s 0
 
-let is_var s =
-  let r = Str.regexp "^[a-zA-Z_][a-zA-Z_0-9-]*$" in
-  s <> "rsp" && Str.string_match r s 0
+let is_var = function
+  | "rsp" | "rcx" | "rdi" | "rsi" | "rdx" | "r8" 
+  | "r9" | "rax" | "rbx" | "rbp" | "r10" | "r11" 
+  | "r12" | "r13" | "r14" | "r15" -> false 
+  | _ as s -> let r = 
+    Str.regexp "^[a-zA-Z_][a-zA-Z_0-9-]*$" in
+    Str.string_match r s 0
 
 let is_sx s =
   s = "rcx" || is_var s
 
 let is_a = function
-    "rdi" | "rsi" | "rdx" | "r8" | "r9" -> true
+  | "rdi" | "rsi" | "rdx" | "r8" | "r9" -> true
   | _ as s -> is_sx s
 
 let is_w = function
-    "rax" | "rbx" | "rbp" | "r10" | "r11" | "r12" | "r13" | "r14" | "r15" -> true
+  | "rax" | "rbx" | "rbp" | "r10" | "r11" | "r12" | "r13" | "r14" | "r15" -> true
   | _ as s -> is_a s
 
 let is_x s = is_w s || s = "rsp"
@@ -54,7 +58,7 @@ let is_t s = is_x s || is_integer s
 let is_s s = is_x s || is_integer s || is_label s
 
 let is_cmp = function
-    "<" | "<=" |"=" -> true
+  | "<" | "<=" |"=" -> true
   | _ -> false
 
 let is_op s = is_aop s || is_sop s
@@ -112,6 +116,9 @@ let calc_gen_and_kill insts_arr =
     | Expr [Atom "return"] ->
       let gen = result @callee_save and kill = [] in
       (SS.of_list gen, SS.of_list kill)
+    | Expr [Atom w; Atom "<-"; Expr [Atom "stack-arg"; Atom n8]] ->
+      let kill = [w] in
+      (SS.empty, SS.of_list kill)
     | _ -> failwith "liveness error: not a valid instruction"
   in
   let len = Array.length insts_arr in
@@ -194,6 +201,7 @@ let print_two_sests {size; first; second} n1 n2=
   print_endline ")"
   end
 
+(* 
 let run_test () =
   let in_and_outs s = List.iter (fun f -> print_two_sests (liveness_analysis f) "in" "out") (parse_string s) in
   let f0 = "(:f 0 0
@@ -218,4 +226,5 @@ let () =
   | _ ->
     let func = read_line () in
     List.iter iteration (parse_string func)
-  (* default input from stdin*)
+    (* default input from stdin*)
+*)
