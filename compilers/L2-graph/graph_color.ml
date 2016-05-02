@@ -25,24 +25,14 @@ let all_registers_except_rcx = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
 let build_interference_graph inst_arr =
   let gen_and_kill_sets = calc_gen_and_kill inst_arr in
   let in_and_out_sets = calc_in_and_out inst_arr in
-  let kill_arr = gen_and_kill_sets.second
+  let gen_arr = gen_and_kill_sets.first
+  and kill_arr = gen_and_kill_sets.second
   and in_arr = in_and_out_sets.first
   and out_arr = in_and_out_sets.second
   and size = in_and_out_sets.size in
-  (*
-  let add_full_graph_from_list ig lst =
-    let arr = Array.of_list lst in 
-    let s = Array.length arr in
-    for i=0 to s-1 do
-      for j=i+1 to s-1 do
-        G.add_edge ig arr.(i) arr.(j)
-      done
-    done
-  in
-  let add_full_graph ig set =
-    add_full_graph_from_list ig (Liveness.SS.elements set)
-  in
-  *)
+  let all_vars =
+    let combine_sets = Array.fold_left (fun acc s -> SS.union acc s) SS.empty in
+    combine_sets (Array.append gen_arr kill_arr) in
   let add_graph_from_list ig lst1 lst2 except =
     let arr1 = Array.of_list lst1
     and arr2 = Array.of_list lst2 in
@@ -64,47 +54,34 @@ let build_interference_graph inst_arr =
     done
   in
   let add_graph ig set1 set2 =
-    add_graph_from_list ig (SS.elements set1) (SS.elements set2)
-  in
+    add_graph_from_list ig (SS.elements set1) (SS.elements set2) in
   let add_graph_per_insts ig inst lives k o =
+    let add_graph_per_insts_help ig lives k o except = begin
+      add_graph ig lives lives except;
+      add_graph ig k o except
+    end in
     match inst with
     | Expr [Atom w; Atom "<-"; Atom s] when is_w w && is_w s ->
-      let excpet = Some (w, s) in
-      begin
-        add_graph ig lives lives excpet;
-        add_graph ig k o excpet
-      end
+      let expt = Some (w, s) in
+      add_graph_per_insts_help ig lives k o expt
     | Expr [Atom w; Atom sop; Atom sx_or_num] when (is_sop sop && is_var sx_or_num) ->
       begin
-        add_graph ig lives lives None;
-        add_graph ig k o None;
+        add_graph_per_insts_help ig lives k o None;
         add_graph_from_list ig [sx_or_num] all_registers_except_rcx None
       end
-    | _ -> begin
-        add_graph ig lives lives None;
-        add_graph ig k o None
-      end
+    | _ -> add_graph_per_insts_help ig lives k o None
   in
   let ig = G.create () in begin
-    (* register are against each othter *)
-    add_graph_from_list ig all_registers all_registers None;
-    (* for first instruction 
-    add_graph ig in_arr.(0) in_arr.(0);
-    add_graph ig kill_arr.(0) out_arr.(0);
-    deal_special_case ig inst_arr.(0);
-    *)
-    add_graph_per_insts ig inst_arr.(0) in_arr.(0) kill_arr.(0) out_arr.(0);
+    (* add all registers and all vars as nodes *)
+    begin add_graph_from_list ig all_registers all_registers None;
+      SS.iter (fun v -> G.add_vertex ig v) all_vars
+    end;
+    begin add_graph_per_insts ig inst_arr.(0) in_arr.(0) kill_arr.(0) out_arr.(0);
     for i=1 to size-1 do
-      (*
-      begin
-      add_graph ig out_arr.(i) out_arr.(i);
-      add_graph ig kill_arr.(i) out_arr.(i);
-      deal_special_case ig inst_arr.(i)
-      end
-      *)
       add_graph_per_insts ig inst_arr.(i) out_arr.(i) kill_arr.(i) out_arr.(i)
-    done;
-      ig
+    done
+    end;
+    ig
   end
 
 let graph_color ig =
@@ -157,10 +134,9 @@ let graph_color ig =
   (* sanity for check*)
   let ig_copy = G.copy ig in
   let init_mapping = List.fold_left (fun acc e -> StrMap.add e e acc) StrMap.empty all_registers in
-  begin match pick_nodes_recr ig_copy (Stack.create ()) with
+  match pick_nodes_recr ig_copy (Stack.create ()) with
     | Some a_stack -> Some (generate_mapping_rec StrMap.empty init_mapping a_stack)
     | None -> None
-  end
 
 let color_map_to_list map =
   StrMap.fold (fun k v acc -> (k, v) :: acc) map []
@@ -169,8 +145,7 @@ let color_map_to_list map =
 
 let print_graph ig =
   let acc v lst =
-    ("(" ^ String.concat " " (v :: (G.succ ig v)) ^ ")") :: lst
-  in
+    ("(" ^ String.concat " " (v :: (G.succ ig v)) ^ ")") :: lst in
   let g_sort_lst = G.fold_vertex acc ig [] |> List.sort G.V.compare in
   "(" ^ String.concat "\n" g_sort_lst ^ ")"
   |> print_endline
@@ -191,7 +166,7 @@ let () = match Sys.argv with
     | Expr (Atom l :: Atom vars :: Atom spill :: insts) ->
       let ig = build_interference_graph (Array.of_list insts) in
       let mapping = graph_color ig in begin
-      print_graph (build_interference_graph (Array.of_list insts));
+      print_graph ig;
       print_newline (
         print_string (
         match mapping with
