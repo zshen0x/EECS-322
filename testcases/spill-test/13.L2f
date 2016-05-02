@@ -1,5 +1,0 @@
-(:f
- 0 0
- (rdi <- 2)
- (call print 1)
- (return)) x s

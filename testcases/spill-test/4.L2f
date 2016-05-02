@@ -1,7 +1,0 @@
-(:g
-  1 1 
-  (x <- rdi) 
-  (y <- (mem rsp 0))
-  (rax -= x) 
-  :end 
-  (rax &= y)) x s
