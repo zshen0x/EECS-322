@@ -23,9 +23,13 @@ let is_label s =
   let r = Str.regexp "^:[a-zA-Z_][a-zA-Z_0-9]*$" in
   Str.string_match r s 0
 
-let is_var s =
-  let r = Str.regexp "^[a-zA-Z_][a-zA-Z_0-9-]*$" in
-  Str.string_match r s 0
+let is_var = function
+  | "rsp" | "rcx" | "rdi" | "rsi" | "rdx" | "r8" 
+  | "r9" | "rax" | "rbx" | "rbp" | "r10" | "r11" 
+  | "r12" | "r13" | "r14" | "r15" -> false 
+  | _ as s -> let r = 
+    Str.regexp "^[a-zA-Z_][a-zA-Z_0-9-]*$" in
+    Str.string_match r s 0
 
 let is_sx s =
   s = "rcx" || is_var s
@@ -176,6 +180,7 @@ let spill func_sexpr var prefix =
   | _ -> failwith "l2-spill: error: not a valid function s-expr"
 
 
+(* 
 let test0 () =
   let func0 = "(:f 
   8 0
@@ -201,3 +206,4 @@ let () =
       match parse_string func with
       | [func_lst] -> print_sexpr [spill func_lst var prefix]
       | _ -> failwith "spill_reader: error: not a valid "
+*)

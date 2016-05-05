@@ -41,8 +41,8 @@ let build_interference_graph inst_arr =
     for i=0 to len1-1 do
       for j=0 to len2-1 do
         if arr1.(i) <> arr2.(j) then
-          let new_edge = G.E.create arr1.(i) () arr2.(j) in
-          if not (List.mem new_edge except) then G.add_edge_e ig new_edge
+          if not (List.mem (arr1.(i), arr2.(j)) except)
+          then G.add_edge ig arr1.(i) arr2.(j)
       done
     done
   in
@@ -55,7 +55,7 @@ let build_interference_graph inst_arr =
     end in
     match inst with
     | Expr [Atom w; Atom "<-"; Atom s] when is_w w && is_w s ->
-      let expt = [G.E.create s () w; G.E.create w () s] in
+      let expt = [(w, s); (s, w)] in
       add_lives_and_kill_out ig lives k o expt
     | Expr [Atom w; Atom sop; Atom sx_or_num] when (is_sop sop && is_var sx_or_num) ->
       begin
@@ -147,6 +147,7 @@ let print_graph ig =
   "(" ^ String.concat "\n" g_sort_lst ^ ")"
   |> print_endline
 
+(*
 let run_test () =
   let test = function
     | Expr (Atom l :: Atom vars :: Atom spill :: insts) ->
@@ -176,3 +177,4 @@ let () = match Sys.argv with
     let func = parse_file filename in
     List.iter foo func
   | _ -> run_test ()
+*)
