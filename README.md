@@ -4,6 +4,8 @@ Compiler Construction in OCaml
 Procedure
 * L1 -> x86-64
 * L2 -> L1
- * spill
- * liveness
- * graph
+ * spill vars
+ * liveness anaysis
+ * graph coloring
+* L3 -> L2
+  * accept partially nested programme 
