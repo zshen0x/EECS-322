@@ -31,8 +31,8 @@ let compile_inst spills replace = function
 (* register allocation work here *)
 let compile_function prefix f_expr =
   begin match f_expr with
-  | Expr (f_label :: vars :: Atom spills_str :: insts) ->
-    begin let ig, my_vars = build_interference_graph (Array.of_list insts) in
+  | Expr (f_label :: nb_vars :: Atom nb_spills_str :: insts) ->
+    let ig, my_vars = build_interference_graph (Array.of_list insts) in
     let var_to_spill a_ig =
       (* don't mut ig *)
       let fold_f v res =
@@ -62,9 +62,9 @@ let compile_function prefix f_expr =
         | Some (to_spill, _) ->
           let nf_expr = Spill.spill f_expr to_spill prefix in
           begin match nf_expr with
-          | Expr (f_label :: vars :: Atom nspills_str :: insts) ->
+          | Expr (f_label :: nnb_vars :: Atom nnb_spills_str :: insts) ->
             begin let n_ig, _ = build_interference_graph (Array.of_list insts) in
-            coloring_spill_loop nf_expr n_ig vars nspills_str
+            coloring_spill_loop nf_expr n_ig nnb_vars nnb_spills_str
             end
           | _ -> failwith "l2c: register allocation: not a valid function expression"
           end
@@ -72,8 +72,7 @@ let compile_function prefix f_expr =
         end
       end
     in
-    coloring_spill_loop f_expr ig vars spills_str
-    end
+    coloring_spill_loop f_expr ig nb_vars nb_spills_str
   | _ -> failwith "l2c: register allocation: not a valid function expression"
   end
 
