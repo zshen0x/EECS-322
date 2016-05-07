@@ -3,7 +3,6 @@ open Spill
 open Liveness
 open Graph_color
 
-
 let compile_inst spills replace = function
   | Expr [Atom w; Atom "<-"; Atom s] ->
     Expr [Atom (replace w); Atom "<-"; Atom (replace s)]
@@ -29,62 +28,54 @@ let compile_inst spills replace = function
   | _ as i -> i
 
 
+(* register allocation work here *)
 let compile_function prefix f_expr =
-  let my_vars =
-    match f_expr with
-    | Expr (f_label :: vars :: Atom spills_str :: insts) ->
-      let gen_and_kill_sets = calc_gen_and_kill (Array.of_list insts) in
-      let gen_sets = gen_and_kill_sets.first
-      and kill_sets = gen_and_kill_sets.second in
-      SS.filter is_var (Array.fold_left (fun acc s -> SS.union acc s) SS.empty (Array.append gen_sets kill_sets))
-    | _ -> failwith "l2c: compile function: function is not well formed"
-  in
-  let var_to_spill a_ig =
-    (* don't mut ig *)
-    let fold_f v res =
-      if SS.mem v my_vars then begin
-        let d = G.out_degree a_ig v in
-        match res with
-        | Some (_, res_d) as old ->
-          if d > res_d then Some (v, d) else old
-        | None -> Some (v, d)
-      end
-      else res
+  begin match f_expr with
+  | Expr (f_label :: vars :: Atom spills_str :: insts) ->
+    begin let ig, my_vars = build_interference_graph (Array.of_list insts) in
+    let var_to_spill a_ig =
+      (* don't mut ig *)
+      let fold_f v res =
+        if SS.mem v my_vars then begin
+          let d = G.out_degree a_ig v in
+          match res with
+          | Some (_, res_d) as old ->
+            if d > res_d then Some (v, d) else old
+          | None -> Some (v, d)
+        end
+        else res
+      in
+      G.fold_vertex fold_f a_ig None
     in
-    G.fold_vertex fold_f a_ig None
-  in
-  let replace_f_gen mapping v =
-    try StrMap.find v mapping
-    with Not_found -> v
-  in
-  let rec coloring_spill_loop = function
-    | Some f_expr ->
-      begin match f_expr with
-        | Expr (f_label :: vars :: Atom spills_str :: insts) ->
-          begin let ig = build_interference_graph (Array.of_list insts) in
-            (* ig should not be mut ( graph_color implementation it copy a ig ) *)
-            let spills = int_of_string spills_str in
-            (* careful there lacks the sanity check here,
-               assume mapping have all vars to reg allocation
-               and that all not in mapping are not vars
-            *)
-            begin match graph_color ig with
-              | Some var2reg ->
-                Some (Expr (f_label :: vars :: Atom spills_str
-                            :: List.map (compile_inst spills (replace_f_gen var2reg)) insts))
-              | None ->
-                begin match var_to_spill ig with
-                  | Some (to_spill, _) ->
-                    coloring_spill_loop (Some (Spill.spill f_expr to_spill prefix))
-                  | None -> None
-                end
+    let replace_f_gen mapping v =
+      try StrMap.find v mapping
+      with Not_found -> v
+    in
+    let rec coloring_spill_loop f_expr a_ig vars spills_str =
+      let spills = int_of_string spills_str in
+      begin match graph_color a_ig with
+      | Some var2reg ->
+        Some (Expr (f_label :: vars :: Atom spills_str
+              :: List.map (compile_inst spills (replace_f_gen var2reg)) insts))
+      | None ->
+        begin match var_to_spill a_ig with
+        | Some (to_spill, _) ->
+          let nf_expr = Spill.spill f_expr to_spill prefix in
+          begin match nf_expr with
+          | Expr (f_label :: vars :: Atom nspills_str :: insts) ->
+            begin let n_ig, _ = build_interference_graph (Array.of_list insts) in
+            coloring_spill_loop nf_expr n_ig vars nspills_str
             end
+          | _ -> failwith "l2c: register allocation: not a valid function expression"
           end
-        | _ -> failwith "l2c: compile function: function is not well formed"
+        | None -> None
+        end
       end
-    | None -> None
-  in
-  coloring_spill_loop (Some f_expr)
+    in
+    coloring_spill_loop f_expr ig vars spills_str
+    end
+  | _ -> failwith "l2c: register allocation: not a valid function expression"
+  end
 
 
 let compile_program = function

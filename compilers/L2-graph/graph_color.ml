@@ -75,9 +75,8 @@ let build_interference_graph inst_arr =
         add_edges_per_inst ig inst_arr.(i) out_arr.(i) kill_arr.(i) out_arr.(i)
       done
     end;
-    ig
+    (ig, all_vars)
   end
-
 
 let graph_color comlete_ig =
   let nb_colors = List.length all_registers in
