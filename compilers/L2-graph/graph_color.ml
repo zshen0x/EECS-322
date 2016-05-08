@@ -1,6 +1,7 @@
 open SExpr
 open Graph
 open Liveness
+open Utils_l2
 
 module G = Graph.Imperative.Graph.Concrete
     (struct
@@ -20,6 +21,7 @@ let all_registers = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
                      "r9"; "rax"; "rbp"; "rbx"; "rcx"; "rdi"; "rdx"; "rsi"]
 let all_registers_except_rcx = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
                                 "r9"; "rax"; "rbp"; "rbx"; "rdi"; "rdx"; "rsi"]
+
 
 let build_interference_graph inst_arr =
   let gen_and_kill_sets = calc_gen_and_kill inst_arr in
@@ -78,7 +80,8 @@ let build_interference_graph inst_arr =
     (ig, all_vars)
   end
 
-let graph_color comlete_ig =
+
+let graph_color original_ig =
   let nb_colors = List.length all_registers in
   let vertex_to_remove a_ig =
     let fold_f v res =
@@ -99,7 +102,7 @@ let graph_color comlete_ig =
     else begin
       match vertex_to_remove mut_ig with
       | Some (v, _) -> begin
-          Stack.push (v, G.succ comlete_ig v) a_stack;
+          Stack.push (v, G.succ original_ig v) a_stack;
           G.remove_vertex mut_ig v;
           pick_nodes_recr mut_ig a_stack
         end
@@ -128,16 +131,18 @@ let graph_color comlete_ig =
     end
   in
   (* sanity for check*)
-  let mut_ig = G.copy comlete_ig in
+  let mut_ig = G.copy original_ig in
   let init_mapping = List.fold_left (fun acc e -> StrMap.add e e acc) StrMap.empty all_registers in
   match pick_nodes_recr mut_ig (Stack.create ()) with
   | Some a_stack -> Some (generate_mapping_recr StrMap.empty init_mapping a_stack)
   | None -> None
 
+
 let color_map_to_list map =
   StrMap.fold (fun k v acc -> (k, v) :: acc) map []
   |> List.rev
   |> List.map (fun (k, v) -> "(" ^ k ^ " " ^ v ^ ")")
+
 
 let print_graph ig =
   let acc v lst =
@@ -145,6 +150,7 @@ let print_graph ig =
   let g_sort_lst = G.fold_vertex acc ig [] |> List.sort G.V.compare in
   "(" ^ String.concat "\n" g_sort_lst ^ ")"
   |> print_endline
+
 
 (*
 let run_test () =

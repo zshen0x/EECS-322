@@ -2,6 +2,8 @@ open SExpr
 open Spill
 open Liveness
 open Graph_color
+open Utils_l2
+
 
 let compile_inst spills replace = function
   | Expr [Atom w; Atom "<-"; Atom s] ->
@@ -30,8 +32,8 @@ let compile_inst spills replace = function
 
 (* register allocation work here *)
 let compile_function prefix f_expr =
-  begin match f_expr with
-  | Expr (f_label :: nb_vars :: Atom nb_spills_str :: insts) ->
+  match f_expr with
+  | Expr (f_label :: vars :: Atom spills_str :: insts) ->
     let ig, my_vars = build_interference_graph (Array.of_list insts) in
     let var_to_spill a_ig =
       (* don't mut ig *)
@@ -39,8 +41,8 @@ let compile_function prefix f_expr =
         if SS.mem v my_vars then begin
           let d = G.out_degree a_ig v in
           match res with
-          | Some (_, res_d) as old ->
-            if d > res_d then Some (v, d) else old
+          | Some (_, res_d) ->
+            if d > res_d then Some (v, d) else res
           | None -> Some (v, d)
         end
         else res
@@ -51,7 +53,7 @@ let compile_function prefix f_expr =
       try StrMap.find v mapping
       with Not_found -> v
     in
-    let rec coloring_spill_loop f_expr a_ig vars spills_str =
+    let rec coloring_spill_loop f_expr a_ig vars spills_str insts =
       let spills = int_of_string spills_str in
       begin match graph_color a_ig with
       | Some var2reg ->
@@ -62,9 +64,9 @@ let compile_function prefix f_expr =
         | Some (to_spill, _) ->
           let nf_expr = Spill.spill f_expr to_spill prefix in
           begin match nf_expr with
-          | Expr (f_label :: nnb_vars :: Atom nnb_spills_str :: insts) ->
-            begin let n_ig, _ = build_interference_graph (Array.of_list insts) in
-            coloring_spill_loop nf_expr n_ig nnb_vars nnb_spills_str
+          | Expr (_ :: nvars :: Atom nspills_str :: ninsts) ->
+            begin let n_ig, _ = build_interference_graph (Array.of_list ninsts) in
+            coloring_spill_loop nf_expr n_ig nvars nspills_str ninsts
             end
           | _ -> failwith "l2c: register allocation: not a valid function expression"
           end
@@ -72,10 +74,8 @@ let compile_function prefix f_expr =
         end
       end
     in
-    coloring_spill_loop f_expr ig nb_vars nb_spills_str
+    coloring_spill_loop f_expr ig vars spills_str insts
   | _ -> failwith "l2c: register allocation: not a valid function expression"
-  end
-
 
 let compile_program = function
   | Expr (p_label :: f_lst) ->
@@ -109,7 +109,7 @@ let () =
   | [|_; filename|] ->
     let print_result = function
       | Some l2_prog -> SExpr.print_sexpr_indent [l2_prog]
-      | None -> print_endline "\"could not register allocate main\""
+      | None -> print_endline "\"could not register allocate\""
     in
     List.iter (fun p -> print_result @@ compile_program p) (parse_file filename)
   | _ -> ()
