@@ -414,6 +414,56 @@ int array_error(int64_t *array, int64_t fw_x) {
    exit(0);
 }
 
+
+int64_t clear_out_line() {
+  while (1) {
+    if (feof(stdin)) return 1;
+    char a_char = getchar();
+    if (a_char == '\n') return 1;
+  }
+}
+
+int64_t read() {
+  int max_digits=6;
+  int value=0;
+  int negative=1;
+  int digits_read=0;
+
+  printf("< ");
+  
+  if (feof(stdin)) return 1;
+  char a_char = getchar();
+
+  if (a_char == '-') {
+    negative=-1;
+    if (feof(stdin)) return 1;
+    a_char=getchar();
+  }
+  
+  if (a_char <= '9' && '0' <= a_char) {
+    value = a_char - '0';
+  } else if (a_char == '\n') {
+    return 1;
+  } else {
+    return clear_out_line();
+  }
+  while (digits_read < max_digits) {
+    if (feof(stdin)) {
+      return value;
+    }
+    a_char=getchar();
+    if (a_char <= '9' && '0' <= a_char) {
+      value = value * 10 + (a_char - '0');
+    } else if (a_char == '\n') {
+      return negative * value * 2 + 1;
+    } else {
+      return clear_out_line();
+    }
+    digits_read++;
+  }
+  return clear_out_line();
+}
+
 /*
  * Program entry-point
  */

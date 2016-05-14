@@ -1,5 +1,4 @@
 
-
 let compose f g x = f (g x)
 
 let is_integer s =
@@ -12,6 +11,8 @@ let is_aop = function
 let is_sop = function
     "<<=" | ">>=" -> true
   | _ -> false
+
+let is_op s = is_aop s || is_sop s
 
 let is_cmp = function
     "<" | "<=" |"=" -> true
@@ -43,4 +44,18 @@ let is_x s = is_w s || s = "rsp";;
 let is_u s = is_w s || is_label s;;
 let is_t s = is_x s || is_integer s;;
 let is_s s = is_x s || is_integer s || is_label s;;
+
+
+let caller_save = ["r10"; "r11"; "r8"; "r9"; "rax"; "rcx"; "rdi"; "rdx"; "rsi"]
+let args = ["rdi"; "rsi"; "rdx"; "rcx"; "r8"; "r9"]
+let callee_save = ["r12"; "r13"; "r14"; "r15"; "rbp"; "rbx"]
+let result = ["rax"]
+
+let all_registers = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
+                     "r9"; "rax"; "rbp"; "rbx"; "rcx"; "rdi"; "rdx"; 
+                     "rsi"]
+
+let all_registers_except_rcx = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
+                                "r9"; "rax"; "rbp"; "rbx"; "rdi"; "rdx"; "rsi"]
+
 

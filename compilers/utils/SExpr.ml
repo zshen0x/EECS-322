@@ -27,7 +27,7 @@ let parse pop_char =
         end
     | Some c ->
         match c with
-        | '(' ->
+        | '(' | '[' ->
             begin match st with
             | Parse_root sl ->
                 let this = aux(Parse_content []) in
@@ -43,7 +43,7 @@ let parse pop_char =
                 aux(Parse_string(false, s, sl))
             | Parse_comment _ -> aux st
             end
-        | ')' ->
+        | ')' | ']' ->
             begin match st with
             | Parse_root sl ->
                 failwith "Parsing error: closing parenthesis without openning"
