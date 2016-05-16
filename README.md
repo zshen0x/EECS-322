@@ -6,6 +6,6 @@ Procedure
 * L2 -> L1
  * spill vars
  * liveness anaysis
- * graph coloring
+ * graph coloring (using ocamlgraph library for graph construction)
 * L3 -> L2
   * accept partially nested programme 
