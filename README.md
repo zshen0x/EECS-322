@@ -7,5 +7,7 @@ Procedure
  * spill vars
  * liveness anaysis
  * graph coloring (using ocamlgraph library for graph construction)
-* L3 -> L2
+* L3 -> L2 (linearization)
   * accept partially nested programme 
+* L4 -> L3 (a-normalization)
+ * cps  
