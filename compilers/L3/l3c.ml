@@ -22,7 +22,7 @@ p ::= (e
        ...)
 ;; note that functions have arguments now(!)
 
-                                                 ;; nested thing happens here 
+                                                 ;; nested thing happens here
 e ::= (let ([var d]) e)                          ;; attention there are 3 cases in compiling e    #(if genereate new labels)#
     | (if v e e)                                 ;; have have impact to tail-call or call in later compile
     | d                                          ;; use compile_d may with additional parameter
@@ -49,7 +49,6 @@ pred ::= number? | a?
 
 Other non-terminals (e.g., label, var) are given in lecture02 and lecture04.
 *)
-
 
 let l3_prefix = "l3_"
 and l3_entry = ":main"
@@ -93,7 +92,7 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
     Expr [dst; Atom "+="; Atom "1"] ::
     ending
   in
-  let bounds_checking_insts arr_sexpr pos_sexpr = 
+  let bounds_checking_insts arr_sexpr pos_sexpr =
     let bounds_pass_label = Atom (get_new_label ())
     and bounds_fail_label = Atom (get_new_label ())
     and tmp = Atom (get_new_var ()) in
@@ -106,6 +105,52 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
     Expr [Atom "rsi"; Atom "<-"; pos_sexpr] ::
     Expr [Atom "call"; Atom "array-error"; Atom "2"] ::
     bounds_pass_label  :: []
+  in
+  let function_call_insts f_sexpr vars_sexprs =
+    let system_calls = [Atom "print"; Atom "allocate"; Atom "array-error"] in
+    let is_system_call = List.mem f_sexpr system_calls
+    and vars_len = List.length vars_sexprs
+    and vars_arr = Array.of_list vars_sexprs
+    and args_len = List.length args
+    and args_arr = Array.of_list args in
+    let call_inst call = Expr [call; f_sexpr; Atom (string_of_int vars_len)]
+    and sto_res_inst = Expr [dst; Atom "<-"; result_reg]
+    and vars2args_insts =
+      let insts_arr = Array.make vars_len (Atom "") in
+      begin
+        for i = 0 to vars_len - 1 do
+          if i < args_len then
+            insts_arr.(i) <- Expr [Atom args_arr.(i); Atom "<-"; vars_arr.(i)]
+          else
+            let n8 = Atom (string_of_int (8 * (i - args_len))) in
+            insts_arr.(i) <- Expr [Expr [Atom "mem"; Atom "rsp"; n8]; Atom "<-"; vars_arr.(i)]
+        done;
+        Array.to_list insts_arr
+      end
+    in
+    if dst = result_reg && vars_len <= args_len && not is_system_call
+    then begin
+      (* tail call *)
+      vars2args_insts @
+      [call_inst (Atom "tail-call")]
+    end
+    else if is_system_call then begin
+      (* system_calls calls *)
+      vars2args_insts @
+      (call_inst (Atom "call") ::
+       sto_res_inst ::
+       ending)
+    end
+    else begin
+      (* normal calls *)
+      let return_label = Atom (get_new_label ()) in
+      Expr [Expr [Atom "mem"; Atom "rsp"; Atom "-8"]; Atom "<-"; return_label] ::
+      vars2args_insts @
+      (call_inst (Atom "call") ::
+       return_label ::
+       sto_res_inst ::
+       ending)
+    end
   in
   begin match inst_d with
     | Add (lhs_v, rhs_v) ->
@@ -145,18 +190,17 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
       Expr [dst; Atom "+="; Atom "3"] ::
       ending
     | App (fun_v, args_v) ->
-      ending
+      let fun_sexpr = compile_l3_v_only fun_v
+      and arg_sexprs = List.map encode_and_compile_l3_v args_v in
+      function_call_insts fun_sexpr arg_sexprs
     | NewArray (size_v, init_v) ->
       (* call to allocate *)
       let size_sexpr = encode_and_compile_l3_v size_v
       and init_sexpr = encode_and_compile_l3_v init_v in
-      Expr [Atom "rsi"; Atom "<-"; size_sexpr] ::
-      Expr [Atom "rdi"; Atom "<-"; init_sexpr] ::
-      Expr [Atom "call"; Atom "allocate"; Atom "2"] ::
-      Expr [dst; Atom "<-"; result_reg] ::
-    | newTuple vals_vst ->
-      (* call to allocate *)
-      ending
+      function_call_insts (Atom "allocate") [size_sexpr; init_sexpr]
+    | NewTuple vals_v ->
+      let arg_sexprs = List.map encode_and_compile_l3_v vals_v in
+      function_call_insts (Atom "allocate") arg_sexprs
     | Aref (arr_v, pos_v) ->
       let arr_sexpr = compile_l3_v_only arr_v
       and pos_sexpr = encode_and_compile_l3_v pos_v in
@@ -186,15 +230,18 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
       ending
     | Print val_v ->
       (* call to print *)
-      let val_sexpr = encode_and_compile_l3_v val_v in
-      Expr [Atom "rdi"; Atom "<-"; val_sexpr] ::
+      let arg_sexprs = [encode_and_compile_l3_v val_v] in
+      function_call_insts (Atom "print") arg_sexprs
+      (* Expr [Atom "rdi"; Atom "<-"; val_sexpr] ::
       Expr [Atom "call"; Atom "print"; Atom "1"] ::
       Expr [dst; Atom "<-"; result_reg] ::
-      ending
+         ending *)
     | V v_v ->
       let var_expr = encode_and_compile_l3_v v_v in
-      Expr [dst; Atom "<-"; var_expr]
+      Expr [dst; Atom "<-"; var_expr] :: ending
     | Read ->
+      (* TODO *)
+      ending
   end
 
 
