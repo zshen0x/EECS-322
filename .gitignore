@@ -28,3 +28,36 @@ runtime.c
 
 # third part libs
 ocamlgraph-1.8.7/
+
+# syslinks
+compilers/L1/l1c.native
+compilers/L1/SExpr.ml
+compilers/L1/SExpr.mli
+compilers/L2/graph_color.ml
+compilers/L2/graph_color.native
+compilers/L2/l2c.native
+compilers/L2/liveness.ml
+compilers/L2/SExpr.ml
+compilers/L2/SExpr.mli
+compilers/L2/spill.ml
+compilers/L2/utils_l2.ml
+compilers/L2-graph/graph_color.native
+compilers/L2-graph/liveness.ml
+compilers/L2-graph/SExpr.ml
+compilers/L2-graph/SExpr.mli
+compilers/L2-graph/utils_l2.ml
+compilers/L2-liveness/liveness.native
+compilers/L2-liveness/SExpr.ml
+compilers/L2-liveness/SExpr.mli
+compilers/L2-liveness/utils_l2.ml
+compilers/L2-spill/SExpr.ml
+compilers/L2-spill/SExpr.mli
+compilers/L2-spill/spill.native
+compilers/L2-spill/utils_l2.ml
+compilers/L3/.#l3c.ml
+compilers/L3/l3c.native
+compilers/L3/l3c_test.native
+compilers/L3/SExpr.ml
+compilers/L3/SExpr.mli
+compilers/L3/utils_l3.ml
+interps

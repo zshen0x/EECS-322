@@ -47,11 +47,11 @@ let rec parse_l3_d = function
     parse_l3_d (Expr [Atom "aref"; v; Atom "0"])
   | Expr [Atom "closure-vars"; v] ->
     parse_l3_d (Expr [Atom "aref"; v; Atom "1"])
-  | Expr vlst ->
+  | Expr (f :: args_sexpr) ->
     (* all other case will fall into function but may fail when it is not valid function *)
-    App (List.map parse_l3_v vlst)
-  | Atom _ as v-> V (parse_l3_v v)
-(* | _ -> failwith "l3c: parse_l3_d: not a valid l3 e " *)
+    App (parse_l3_v f, (List.map parse_l3_v args_sexpr))
+  | Atom _ as v -> V (parse_l3_v v)
+  | _ -> failwith "l3c: parse_l3_d: not a valid l3 e"
 
 
 let rec parse_l3_e = function

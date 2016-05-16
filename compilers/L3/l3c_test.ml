@@ -11,7 +11,7 @@ let parser_test () =
                  (if xlt2
                      1
                      0))))"
-    and prog0_exp = [Prog ((D (App [Label ":fib"; Num (Int64.of_int 18)])),
+    and prog0_exp = [Prog ((D (App (Label ":fib", [Num (Int64.of_int 18)]))),
                            [Fun (Label ":fib", [Var "x"],
                                  Let ((Var "xlt2", Less (Var "x", Num (Int64.of_int 2))),
                                      If (Var "xlt2", D (V (Num Int64.one)), D (V (Num Int64.zero)))))])]
@@ -45,7 +45,7 @@ let parser_test () =
               (aset k k k) (read) (print sklkk) 10)"
     and d0_exp = [[Add (Num (Int64.of_string "1"), Num (Int64.of_string "2"));
                    Sub (Var "s", Var "k"); NumberQo (Var "k"); AQo (Var "arr");
-                   App [Label ":fib"; Var "a"; Var "b"]; NewArray (Var "s", Var "v");
+                   App (Label ":fib", [Var "a"; Var "b"]); NewArray (Var "s", Var "v");
                    NewTuple [Var "k"; Var "d"; Var "j"]; Aref (Num (Int64.of_string "123456"), Var "var");
                    Aset (Var "k", Var "k", Var "k"); Read; Print (Var "sklkk"); V (Num (Int64.of_int 10))]]
     and d1 = "((make-closure :sdf fs) (closure-proc myvar) (closure-vars 3423))"
