@@ -1,6 +1,7 @@
 open Parser_l3
 open AST_l3
 open SExpr
+open L3c
 
 let parser_test () =
   let test_parse_prog () =
@@ -78,6 +79,10 @@ let parser_test () =
   test_parse_l3_e ();
   test_parse_prog ();
   print_endline "all parser test passed !"
+
+
+let l3c_test () = ()
+
 
 let () =
   parser_test ()

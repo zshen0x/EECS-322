@@ -14,7 +14,6 @@ module List = struct
   end
 
 (*
-
    ;; labels are globally unique
    ;; vars are local to function
 p ::= (e
@@ -50,34 +49,30 @@ pred ::= number? | a?
 Other non-terminals (e.g., label, var) are given in lecture02 and lecture04.
 *)
 
-let l3_prefix = "l3_"
+let l3_var_prefix = "l3_var"
+and l3_label_prefix = "l3_label_"
 and l3_entry = ":main"
-and l3_new_var_prefix = "tmp"
-and l3_new_label_prefix = ":labl"
+and fresh_l2_label_prefix = ":label_"
 and result_reg = Atom "rax"
+and tmp_var = Atom "tmp" (* only used in bounds check and must init every usssage and could be used multiple times *)
 
 (* encoding number *)
 let encode_l3_v = function
-  | Num n -> Num (Int64.shift_left n 1)
+  | Num n -> Num (Int64.add Int64.one (Int64.shift_left n 1))
   | els -> els
 
 (* v -> expr (Atom ...) *)
-let compile_l3_v label_prefixer var_prefixer = function
-  | Var v -> Atom (var_prefixer v)
-  | Label l -> Atom (label_prefixer l)
+let compile_l3_v_generator l3_label_prefixer l3_var_rename = function
+  | Var v -> Atom (l3_var_rename v)
+  | Label l -> Atom (l3_label_prefixer l)
   | Num n -> Atom (Int64.to_string n)
 
 (* d -> expr list *)
-let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_d =
-  let encode_and_compile_l3_v v_v =
-    encode_l3_v v_v
-    |> compile_l3_v label_prefixer var_prefixer
-  and compile_l3_v_only = compile_l3_v label_prefixer var_prefixer
-  and ending = if dst = result_reg then [Expr [Atom "return"]] else []
-  in
+let compile_l3_d l3_label_prefixer get_fresh_l2_label my_compile_l3_v dst inst_d =
+  let ending = if dst = result_reg then [Expr [Atom "return"]] else [] in
   let add_sub_insts lhs_v rhs_v op amend =
-    let lhs = encode_and_compile_l3_v lhs_v
-    and rhs = encode_and_compile_l3_v rhs_v in
+    let lhs = my_compile_l3_v (encode_l3_v lhs_v)
+    and rhs = my_compile_l3_v (encode_l3_v rhs_v) in
     Expr [dst; Atom "<-"; lhs] ::
     Expr [dst; op; rhs] ::
     Expr [dst; amend; Atom "1"] ::
@@ -85,29 +80,30 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
   in
   let cmp_insts lhs_v rhs_v sop =
     (* comparison no need of encoding, but result are encoded*)
-    let lhs = compile_l3_v_only lhs_v
-    and rhs = compile_l3_v_only rhs_v in
+    let lhs = my_compile_l3_v (encode_l3_v lhs_v)
+    and rhs = my_compile_l3_v (encode_l3_v rhs_v) in
     Expr [dst; Atom "<-"; lhs; sop; rhs] ::
     Expr [dst; Atom "<<="; Atom "1"] ::
     Expr [dst; Atom "+="; Atom "1"] ::
     ending
   in
   let bounds_checking_insts arr_sexpr pos_sexpr =
-    let bounds_pass_label = Atom (get_new_label ())
-    and bounds_fail_label = Atom (get_new_label ())
-    and tmp = Atom (get_new_var ()) in
+    (* TODO not complete checking code since index may also be less than 0 *)
+    (* TODO TODO TODO TODO TODO TODO *)
+    let bounds_pass_label = Atom (get_fresh_l2_label ())
+    and bounds_fail_label = Atom (get_fresh_l2_label ()) in
     Expr [dst; Atom "<-"; pos_sexpr] ::
     Expr [dst; Atom ">>="; Atom "1"] ::
-    Expr [tmp; Atom "<-"; Expr [Atom "mem"; arr_sexpr; Atom "0"]] ::
-    Expr [Atom "cjump"; dst; Atom "<"; tmp; bounds_pass_label; bounds_fail_label] ::
+    Expr [tmp_var; Atom "<-"; Expr [Atom "mem"; arr_sexpr; Atom "0"]] ::
+    Expr [Atom "cjump"; dst; Atom "<"; tmp_var; bounds_pass_label; bounds_fail_label] ::
     bounds_fail_label ::
     Expr [Atom "rdi"; Atom "<-"; arr_sexpr] ::
     Expr [Atom "rsi"; Atom "<-"; pos_sexpr] ::
     Expr [Atom "call"; Atom "array-error"; Atom "2"] ::
     bounds_pass_label  :: []
   in
-  let function_call_insts f_sexpr vars_sexprs =
-    let system_calls = [Atom "print"; Atom "allocate"; Atom "array-error"] in
+  let function_call_insts ?(extras=[]) f_sexpr vars_sexprs =
+    let system_calls = [Atom "print"; Atom "allocate"; Atom "array-error"; Atom "read"] in
     let is_system_call = List.mem f_sexpr system_calls
     and vars_len = List.length vars_sexprs
     and vars_arr = Array.of_list vars_sexprs
@@ -122,7 +118,7 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
           if i < args_len then
             insts_arr.(i) <- Expr [Atom args_arr.(i); Atom "<-"; vars_arr.(i)]
           else
-            let n8 = Atom (string_of_int (8 * (i - args_len))) in
+            let n8 = Atom (string_of_int (8 * (args_len - i - 2))) in
             insts_arr.(i) <- Expr [Expr [Atom "mem"; Atom "rsp"; n8]; Atom "<-"; vars_arr.(i)]
         done;
         Array.to_list insts_arr
@@ -138,12 +134,12 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
       (* system_calls calls *)
       vars2args_insts @
       (call_inst (Atom "call") ::
-       sto_res_inst ::
-       ending)
+       sto_res_inst :: extras
+       @ ending)
     end
     else begin
       (* normal calls *)
-      let return_label = Atom (get_new_label ()) in
+      let return_label = Atom (get_fresh_l2_label ()) in
       Expr [Expr [Atom "mem"; Atom "rsp"; Atom "-8"]; Atom "<-"; return_label] ::
       vars2args_insts @
       (call_inst (Atom "call") ::
@@ -158,14 +154,13 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
     | Sub (lhs_v, rhs_v) ->
       add_sub_insts lhs_v rhs_v (Atom "-=") (Atom "+=")
     | Mul (lhs_v, rhs_v) ->
-      let lhs = encode_and_compile_l3_v lhs_v
-      and rhs = encode_and_compile_l3_v rhs_v
-      and tmp = Atom (get_new_var ()) in
-      Expr [tmp; Atom "<-"; lhs] ::
-      Expr [tmp; Atom ">>="; Atom "1"] ::
+      let lhs = my_compile_l3_v (encode_l3_v lhs_v)
+      and rhs = my_compile_l3_v (encode_l3_v rhs_v) in
+      Expr [tmp_var; Atom "<-"; lhs] ::
+      Expr [tmp_var; Atom ">>="; Atom "1"] ::
       Expr [dst; Atom "<-"; rhs] ::
       Expr [dst; Atom ">>="; Atom "1"] ::
-      Expr [dst; Atom "*="; tmp] ::
+      Expr [dst; Atom "*="; tmp_var] ::
       Expr [dst; Atom "<<="; Atom "1"] :: (* equaivalent to dst *= 2 *)
       Expr [dst; Atom "+="; Atom "1"] ::
       ending
@@ -176,34 +171,46 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
     | Equal (lhs_v, rhs_v) ->
       cmp_insts lhs_v rhs_v (Atom "=")
     | NumberQo any_v ->
-      let any_sexpr = encode_and_compile_l3_v any_v in
+      let any_sexpr = my_compile_l3_v (encode_l3_v any_v) in
       Expr [dst; Atom "<-"; any_sexpr] ::
       Expr [dst; Atom "&="; Atom "1"] ::
       Expr [dst; Atom "<<="; Atom "1"] ::
       Expr [dst; Atom "+="; Atom "1"] ::
       ending
     | AQo any_v ->
-      let any_sexpr = encode_and_compile_l3_v any_v in
+      let any_sexpr = my_compile_l3_v (encode_l3_v any_v) in
       Expr [dst; Atom "<-"; any_sexpr] ::
       Expr [dst; Atom "&="; Atom "1"] ::
       Expr [dst; Atom "*="; Atom "-2"] ::
       Expr [dst; Atom "+="; Atom "3"] ::
       ending
     | App (fun_v, args_v) ->
-      let fun_sexpr = compile_l3_v_only fun_v
-      and arg_sexprs = List.map encode_and_compile_l3_v args_v in
+      let fun_sexpr = my_compile_l3_v fun_v
+      and arg_sexprs = List.map (fun arg_v -> my_compile_l3_v @@ encode_l3_v arg_v) args_v in
       function_call_insts fun_sexpr arg_sexprs
     | NewArray (size_v, init_v) ->
       (* call to allocate *)
-      let size_sexpr = encode_and_compile_l3_v size_v
-      and init_sexpr = encode_and_compile_l3_v init_v in
+      (* size of the array is not encoded specified in L1 definition *)
+      let size_sexpr = my_compile_l3_v (encode_l3_v size_v)
+      and init_sexpr = my_compile_l3_v (encode_l3_v init_v) in
       function_call_insts (Atom "allocate") [size_sexpr; init_sexpr]
     | NewTuple vals_v ->
-      let arg_sexprs = List.map encode_and_compile_l3_v vals_v in
-      function_call_insts (Atom "allocate") arg_sexprs
+      let loc = ref 0 in
+      let val_assign val_sexpr =
+        let n8 = Atom (string_of_int (8 * (!loc + 1))) in
+        begin
+          incr loc;
+          Expr [Expr [Atom "mem"; dst; n8]; Atom "<-"; val_sexpr]
+        end
+      in
+      let size_sexpr = my_compile_l3_v (encode_l3_v (Num (Int64.of_int (List.length vals_v))))
+      and init_sexpr = Atom "1"
+      and initials_sexprs = List.map (fun arg_v -> my_compile_l3_v @@ encode_l3_v arg_v) vals_v in
+      let assign_initals_insts = List.map val_assign initials_sexprs in
+      function_call_insts (Atom "allocate") [size_sexpr; init_sexpr] ~extras: assign_initals_insts 
     | Aref (arr_v, pos_v) ->
-      let arr_sexpr = compile_l3_v_only arr_v
-      and pos_sexpr = encode_and_compile_l3_v pos_v in
+      let arr_sexpr = my_compile_l3_v arr_v
+      and pos_sexpr = my_compile_l3_v (encode_l3_v pos_v) in
       bounds_checking_insts arr_sexpr pos_sexpr @
       (Expr [dst; Atom "<<="; Atom "3"] ::
        Expr [dst; Atom "+="; arr_sexpr] ::
@@ -211,9 +218,9 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
        ending)
     | Aset (arr_v, pos_v, val_v) ->
       (* associate with boundry checking *)
-      let arr_sexpr = compile_l3_v_only arr_v
-      and pos_sexpr = encode_and_compile_l3_v pos_v
-      and val_sexpr = encode_and_compile_l3_v val_v in
+      let arr_sexpr = my_compile_l3_v arr_v
+      and pos_sexpr = my_compile_l3_v (encode_l3_v pos_v)
+      and val_sexpr = my_compile_l3_v (encode_l3_v val_v) in
       bounds_checking_insts arr_sexpr pos_sexpr @
       (Expr [dst; Atom "<<="; Atom "3"] :: (* equaivalent to dst *= 8 *)
        Expr [dst; Atom "+="; arr_sexpr] ::
@@ -222,7 +229,7 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
        ending)
     | Alen arr_v ->
       (* arr_v can not be constant *)
-      let arr_sexpr = compile_l3_v_only arr_v in
+      let arr_sexpr = my_compile_l3_v arr_v in
       let mem_sexpr = Expr [Atom "mem"; arr_sexpr; Atom "0"] in
       Expr [dst; Atom "<-"; mem_sexpr] ::
       Expr [dst; Atom "<<="; Atom "1"] ::
@@ -230,58 +237,84 @@ let compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_
       ending
     | Print val_v ->
       (* call to print *)
-      let arg_sexprs = [encode_and_compile_l3_v val_v] in
+      let arg_sexprs = [my_compile_l3_v (encode_l3_v val_v)] in
       function_call_insts (Atom "print") arg_sexprs
-      (* Expr [Atom "rdi"; Atom "<-"; val_sexpr] ::
-      Expr [Atom "call"; Atom "print"; Atom "1"] ::
-      Expr [dst; Atom "<-"; result_reg] ::
-         ending *)
     | V v_v ->
-      let var_expr = encode_and_compile_l3_v v_v in
+      let var_expr = my_compile_l3_v (encode_l3_v v_v) in
       Expr [dst; Atom "<-"; var_expr] :: ending
-    | Read ->
-      (* TODO *)
-      ending
+    | Read -> function_call_insts (Atom "read") []
   end
 
-
+(* unsafe mutable hashtable *)
+(* important now evaluate order matters *)
 (* e -> expr list *)
-let rec compile_l3_e label_prefixer var_prefixer get_new_label get_new_var = function
+let rec compile_l3_e l3_label_prefixer get_fresh_l2_label l3_var_map get_fresh_l2_var l3_e =
+  let my_compile_l3_v =
+    compile_l3_v_generator l3_label_prefixer (fun v -> try Hashtbl.find l3_var_map v with Not_found -> failwith (v ^ " is not found"))
+  in
+  match l3_e with
   | Let ((dst_v, inst_d), body_e) ->
     (* binding not in tail position *)
     (* dst_v must be a var *)
-    let dst = compile_l3_v label_prefixer var_prefixer dst_v in
-    compile_l3_d label_prefixer var_prefixer get_new_label get_new_var dst inst_d
-    @ compile_l3_e label_prefixer var_prefixer get_new_label get_new_var body_e
+    let l3_dst =
+      match dst_v with
+      | Var id -> id
+      | _ -> failwith "l3_e: let binding must be a variable !"
+    in
+    let l2_dst = get_fresh_l2_var () in
+    let bind_insts = compile_l3_d l3_label_prefixer get_fresh_l2_label my_compile_l3_v (Atom l2_dst) inst_d in
+    begin
+      Hashtbl.add l3_var_map l3_dst l2_dst; (*add new binding to shadow when evaluate body_e *)
+      let body_insts =
+        compile_l3_e l3_label_prefixer get_fresh_l2_label l3_var_map get_fresh_l2_var body_e in
+      begin
+        (* to avoid copy hashtable in restore the mapping *)
+        Hashtbl.remove l3_var_map l3_dst;
+        bind_insts @ body_insts
+      end
+    end
   | If (test_v, thn_e, els_e) ->
     (* if sematics everythin is not number zero is true *)
-    let then_label = Atom (get_new_label ())
-    and else_label = Atom (get_new_label ())
-    and test = compile_l3_v label_prefixer var_prefixer (encode_l3_v test_v) (* need to encode v could be any v *)
-    and then_insts = compile_l3_e label_prefixer var_prefixer get_new_label get_new_var thn_e
-    and else_insts = compile_l3_e label_prefixer var_prefixer get_new_label get_new_var els_e
+    let encoded_false = Atom "1" in
+    let then_label = Atom (get_fresh_l2_label ())
+    and else_label = Atom (get_fresh_l2_label ())
+    and test = my_compile_l3_v (encode_l3_v test_v) (* need to encode v could be any v *)
+    and then_insts = compile_l3_e l3_label_prefixer get_fresh_l2_label l3_var_map get_fresh_l2_var thn_e
+    and else_insts = compile_l3_e l3_label_prefixer get_fresh_l2_label l3_var_map get_fresh_l2_var els_e
     in
-    Expr [Atom"cjump"; test; Atom "="; Atom "2"; else_label; then_label] ::
-    then_label :: then_insts @ else_label :: else_insts
+    Expr [Atom"cjump"; test; Atom "="; encoded_false; else_label; then_label] ::
+    then_label :: then_insts
+    @ else_label :: else_insts
   | D inst_d ->
     (* nested e's tail position store result to result register *)
     (* return or tail-call should be determined in compile_l3_d with info of dst *)
-    compile_l3_d label_prefixer var_prefixer
-                 get_new_label get_new_var
-                 result_reg inst_d
+    compile_l3_d l3_label_prefixer get_fresh_l2_label my_compile_l3_v result_reg inst_d
 
 
 (* rename vars during compile function with prefix and generate new local vars *)
 (* f -> expr *)
-let compile_l3_f fun_label_prefixer label_prefixer get_new_label = function
+let compile_l3_f l3_fun_label_prefixer l3_label_prefixer get_fresh_l2_label = function
   | Fun (fun_labl, vars_v, body_e) ->
-    let var_cnt = ref 0 in
-    let get_new_var () =
-      (* variable local to function *)
-      let var = l3_new_var_prefix ^ string_of_int !var_cnt in
-      (incr var_cnt;
-      var)
-    and var_prefixer id = l3_prefix ^ id in
+    let l2_var_cnt = ref 0 in
+    let get_fresh_l2_var () = (* prefix means this var stems from l3 *)
+      let l2_var = l3_var_prefix ^ string_of_int !l2_var_cnt in
+      begin
+        incr l2_var_cnt;
+        l2_var
+      end
+    in
+    let l3_var_map = Hashtbl.create (List.length vars_v) in
+    let rename_l3_args l3_var =
+      try
+        Hashtbl.find l3_var_map l3_var
+      with Not_found ->
+        let l2_var = get_fresh_l2_var () in
+        begin
+          Hashtbl.add l3_var_map l3_var l2_var;
+          l2_var
+        end
+    in
+    let my_compile_l3_v = compile_l3_v_generator l3_label_prefixer rename_l3_args in
     let assign_args_to_vars vars_v =
       let args_len = List.length args
       and args_arr = Array.of_list args
@@ -289,7 +322,7 @@ let compile_l3_f fun_label_prefixer label_prefixer get_new_label = function
       and vars_v_arr = Array.of_list vars_v in (* vars must all be vars but no checks *)
       let assign_insts = Array.make vars_len (Atom "") in
       for i = 0 to vars_len-1 do
-        let v_sexpr = compile_l3_v label_prefixer var_prefixer vars_v_arr.(i) in
+        let v_sexpr = my_compile_l3_v vars_v_arr.(i) in
         if i < args_len then
           assign_insts.(i) <- Expr [v_sexpr; Atom "<-"; Atom args_arr.(i)]
         else
@@ -298,26 +331,31 @@ let compile_l3_f fun_label_prefixer label_prefixer get_new_label = function
       done;
       Array.to_list assign_insts
     in
-    let labl = compile_l3_v fun_label_prefixer var_prefixer fun_labl (* fun_labl must be label check during parser *)
+    let labl = compile_l3_v_generator l3_fun_label_prefixer (fun x -> x) fun_labl (* fun_labl must be label check during parser *)
     and vars = Atom (string_of_int (List.length vars_v))
     and spills = Atom "0"
-    and insts = assign_args_to_vars vars_v
-                @ compile_l3_e label_prefixer var_prefixer get_new_label get_new_var body_e in
+    and insts =
+      let assign_insts = assign_args_to_vars vars_v in
+      let body_insts = compile_l3_e l3_label_prefixer get_fresh_l2_label l3_var_map get_fresh_l2_var body_e in
+      assign_insts @ body_insts
+    in
     Expr ([labl; vars; spills] @ insts)
 
 (* all other label (labels are global unique ) except :main should be renamed with prefix*)
 let compile_l3_p = function
   | Prog (entry_e, fundefs) ->
-    let label_cnt = ref 0 in
-    let get_new_label () =
+    let l2_label_cnt = ref 0 in
+    let get_fresh_l2_label () =
       (* label global to program *)
-      let labl = l3_new_label_prefix ^ string_of_int !label_cnt in
-      (incr label_cnt;
-      labl)
-    and label_prefixer labl =
-      ":" ^ l3_prefix ^ String.sub labl 1 ((String.length labl) - 1)
-    and identical_label l = l
+      let labl = fresh_l2_label_prefix ^ string_of_int !l2_label_cnt in
+      begin
+        incr l2_label_cnt;
+        labl
+      end
+    and l3_label_prefixer labl =
+      ":" ^ l3_label_prefix ^ String.sub labl 1 ((String.length labl) - 1)
+    and identical i = i
     in
     let entry_fun = Fun (Label l3_entry, [], entry_e)
-    and fs = List.map (compile_l3_f identical_label label_prefixer get_new_label) fundefs in
-    Expr (Atom l3_entry :: (compile_l3_f label_prefixer label_prefixer get_new_label entry_fun) :: fs)
+    and fs = List.map (compile_l3_f l3_label_prefixer l3_label_prefixer get_fresh_l2_label) fundefs in
+    Expr (Atom l3_entry :: (compile_l3_f identical l3_label_prefixer get_fresh_l2_label entry_fun) :: fs)

@@ -1,5 +1,5 @@
 # EECS-322
-Compiler Construction in OCaml 
+a Lisp dialogue Compiler Construction in OCaml 
 
 Procedure
 * L1 -> x86-64
@@ -11,3 +11,4 @@ Procedure
   * accept partially nested programme 
 * L4 -> L3 (a-normalization)
  * cps  
+* L5 -> l4
