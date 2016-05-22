@@ -80,9 +80,7 @@ let parser_test () =
   test_parse_prog ();
   print_endline "all parser test passed !"
 
-
 let l3c_test () = ()
-
 
 let () =
   parser_test ()

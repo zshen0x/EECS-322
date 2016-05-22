@@ -1,28 +1,31 @@
 
-type v = Var of string | Label of string | Num of int64
+type v = L3Var of string | L3Label of string | L3Num of int64
 
-type d = Add of v * v
-       | Sub of v * v
-       | Mul of v * v
-       | Less of v * v
-       | LessEq of v * v
-       | Equal of v * v
-       | NumberQo of v
-       | AQo of v
-       | App of v * v list
-       | NewArray of v * v
-       | NewTuple of v list
-       | Aref of v * v
-       | Aset of v * v * v
-       | Alen of v
-       | Print of v
-       | V of v
-       | Read
+type d = L3Add of v * v
+       | L3Sub of v * v
+       | L3Mul of v * v
+       | L3Less of v * v
+       | L3LessEq of v * v
+       | L3Equal of v * v
+       | L3NumberQo of v
+       | L3AQo of v
+       | L3App of v * v list
+       | L3NewArray of v * v
+       | L3NewTuple of v list
+       | L3Aref of v * v
+       | L3Aset of v * v * v
+       | L3MakeClosure of string * v
+       | L3ClosureProc of v
+       | L3ClosureVars of v
+       | L3Alen of v
+       | L3Print of v
+       | L3V of v
+       | L3Read
 
-type e = Let of (v * d) * e
-       | If of v * e * e
-       | D of d
+type e = L3Let of (string * d) * e
+       | L3If of v * e * e
+       | L3D of d
 
-type f = Fun of v * v list * e
+type f = L3Fun of string * string list * e
 
-type p = Prog of e * f list
+type p = L3Prog of e * f list
