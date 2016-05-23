@@ -1,7 +1,7 @@
 # EECS-322
-a Lisp dialogue Compiler Construction in OCaml 
+Lisp dialogue Compiler Construction in OCaml 
 
-Procedure
+Steps
 * L1 -> x86-64
 * L2 -> L1
  * spill vars
@@ -10,5 +10,7 @@ Procedure
 * L3 -> L2 (linearization)
   * accept partially nested programme 
 * L4 -> L3 (a-normalization)
- * cps  
-* L5 -> l4
+ * cps (compile with continuation)
+* L5 -> L4
+ * recursive binding
+ * lambda (λ)
