@@ -5,28 +5,26 @@ open FrontEndUtils
 (* let's try to compile with continuation *)
 
 let l3_var_prefix = "l3_var"
-and l4_var_prefix = "l4_"
+and l4_var_prefix = "l4_var"
 
 (* top-level function *)
-
-let l4_var_prefixer l4_var = l4_var_prefix ^ l4_var
-
 let is_l3_val = function
   | L3V _ -> true
   | _ -> false
 
+let get_fresh_var_generator prefix =
+  let var_cnt = ref 0 in
+  fun () ->
+    let l3_var = prefix ^ string_of_int !var_cnt in
+    begin
+      incr var_cnt;
+      l3_var
+    end
+
 (* l4_e k -> l3_e *)
 (* fill d k = k d so eliminate fill *)
 let compile_l4_e l4_e =
-  let get_fresh_l3_var =
-    let l3_var_cnt = ref 0 in
-    fun () ->
-      let l3_var = l3_var_prefix ^ string_of_int !l3_var_cnt in
-      begin
-        incr l3_var_cnt;
-        l3_var
-      end
-  in
+  let get_fresh_l3_var = get_fresh_var_generator l3_var_prefix in
   let maybe_let d f =
     match d with
     | L3V v -> f d
@@ -36,11 +34,11 @@ let compile_l4_e l4_e =
   in
   let rec norm_rec l4_e k =
     match l4_e with
-    | L4Var id -> k (L3D (L3V (L3Var (l4_var_prefixer id)))) (* variable renaming *)
+    | L4Var id -> k (L3D (L3V (L3Var id))) (* variable renaming *)
     | L4Label id -> k (L3D (L3V (L3Label id)))
     | L4Num n -> k (L3D (L3V (L3Num n)))
     | L4Let ((var_str, bind_e), body_e) ->
-      norm_let_k (l4_var_prefixer var_str) bind_e body_e k
+      norm_let_k var_str bind_e body_e k
     | L4If (cond_e, thn_e, els_e) ->
       norm_rec cond_e
         (function
@@ -151,9 +149,73 @@ and norm_biop_k lhs_e rhs_e k what =
   norm l4_e
 
 let compile_l4_f = function
-  | L4Fun (label, args, body_e) ->
-    L3Fun (label, (List.map l4_var_prefixer args), compile_l4_e body_e)
+  | L4Fun (labl, args, body_e) ->
+    (* rename pass happen here *)
+    L3Fun (labl, args, compile_l4_e body_e)
+
+
+let rename_var_l4_e get_fresh_l4_var l4_var_map l4_e =
+  let rec rename_var_e = function
+    | L4Var v -> L4Var (Hashtbl.find l4_var_map v)
+    | L4Add (l, r) -> L4Add (rename_var_e l, rename_var_e r)
+    | L4Sub (l, r) -> L4Sub (rename_var_e l, rename_var_e r)
+    | L4Mul (l, r) -> L4Mul (rename_var_e l, rename_var_e r)
+    | L4Less (l, r) -> L4Less (rename_var_e l, rename_var_e r)
+    | L4LessEq (l, r) -> L4LessEq (rename_var_e l, rename_var_e r)
+    | L4Equal (l, r) -> L4Equal (rename_var_e l, rename_var_e r)
+    | L4NumberQo e -> L4NumberQo (rename_var_e e)
+    | L4AQo e -> L4AQo (rename_var_e e)
+    | L4App (f, args) -> L4App (rename_var_e f, (List.map rename_var_e args))
+    | L4NewArray (l, r) -> L4NewArray (rename_var_e l, rename_var_e r)
+    | L4NewTuple vals -> L4NewTuple (List.map rename_var_e vals)
+    | L4Aref (l, r) -> L4Aref (rename_var_e l, rename_var_e r)
+    | L4Aset (e1, e2, e3) -> L4Aset (rename_var_e e1, rename_var_e e2, rename_var_e e3)
+    | L4Alen e -> L4Alen (rename_var_e e)
+    | L4Begin (e1, e2) -> L4Begin (rename_var_e e1, rename_var_e e2)
+    | L4Print e -> L4Print (rename_var_e e)
+    | L4MakeClosure (labl, e) -> L4MakeClosure (labl, rename_var_e e)
+    | L4ClosureProc e -> L4ClosureProc (rename_var_e e)
+    | L4ClosureVars e -> L4ClosureVars (rename_var_e e)
+    | L4If (e1, e2, e3) -> L4If (rename_var_e e1, rename_var_e e2, rename_var_e e3)
+    | L4Let ((var, e1), e2) ->
+      let new_l4_var = get_fresh_l4_var () in
+        let renamed_e1 = rename_var_e e1 in
+        begin
+          Hashtbl.add l4_var_map var new_l4_var;
+          let renamed_e2 = rename_var_e e2 in
+          begin
+            Hashtbl.remove l4_var_map var;
+            L4Let ((new_l4_var, renamed_e1), renamed_e2)
+          end
+
+        end
+    | _ as e -> e
+  in
+  rename_var_e l4_e
+
+let rename_var_l4_f = function
+  | L4Fun (labl, args, body_e) ->
+    let get_fresh_l4_var = get_fresh_var_generator l4_var_prefix in
+    let l4_var_map = Hashtbl.create (List.length args) in
+    let rename_l4_args l4_var =
+      try
+        Hashtbl.find l4_var_map l4_var
+      with Not_found ->
+        let new_l4_var = get_fresh_l4_var () in
+        begin
+          Hashtbl.add l4_var_map l4_var new_l4_var;
+          new_l4_var
+        end
+    in
+    let renamed_args = List.map rename_l4_args args in
+    let renamed_body_e = rename_var_l4_e get_fresh_l4_var l4_var_map body_e in
+    L4Fun (labl, renamed_args, renamed_body_e)
 
 let compile_l4_p = function
   | L4Prog (prog_e, fundefs) ->
-    L3Prog (compile_l4_e prog_e, List.map compile_l4_f fundefs)
+    (* preprocessing happen here *)
+    let processed_prog_e =
+      rename_var_l4_e (get_fresh_var_generator l4_var_prefix) (Hashtbl.create 0) prog_e in
+    let processed_fundefs = List.map rename_var_l4_f fundefs in
+    L3Prog (compile_l4_e processed_prog_e,
+            List.map compile_l4_f processed_fundefs)
