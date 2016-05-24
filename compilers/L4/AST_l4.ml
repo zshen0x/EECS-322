@@ -17,6 +17,7 @@ type e = L4Var of string
        | L4NewTuple of e list
        | L4Aref of e * e
        | L4Aset of e * e * e
+       | L4Alen of e
        | L4Begin of e * e
        | L4MakeClosure of string * e
        | L4ClosureProc of e

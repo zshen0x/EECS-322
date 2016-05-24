@@ -30,8 +30,8 @@ let rec parse_l3_d = function
     L3AQo (parse_l3_v v)
   | Expr [Atom "new-array"; size; init] ->
     L3NewArray (parse_l3_v size, parse_l3_v init)
-  | Expr (Atom "new-tuple" :: initials) ->
-    L3NewTuple (List.map parse_l3_v initials)
+  | Expr (Atom "new-tuple" :: vals) ->
+    L3NewTuple (List.map parse_l3_v vals)
   | Expr [Atom "aref"; arr; pos] ->
     L3Aref (parse_l3_v arr, parse_l3_v pos)
   | Expr [Atom "aset"; arr; pos; v] ->

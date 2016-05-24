@@ -16,7 +16,7 @@ let is_l3_val = function
   | _ -> false
 
 (* l4_e k -> l3_e *)
-(* fill d k = k d so eliminate fill*)
+(* fill d k = k d so eliminate fill *)
 let compile_l4_e l4_e =
   let get_fresh_l3_var =
     let l3_var_cnt = ref 0 in
@@ -58,11 +58,20 @@ let compile_l4_e l4_e =
     | L4Equal (lhs_e, rhs_e) -> norm_biop_k lhs_e rhs_e k (fun l r -> L3Equal (l, r))
     | L4NumberQo any_e -> norm_unary_k any_e k (fun v -> L3NumberQo v)
     | L4AQo any_e -> norm_unary_k any_e k (fun v -> L3AQo v)
-    | L4App (fun_e, args_es) -> L3D (L3V (L3Label "to do arbitray args"))
+    | L4App (fun_e, args_es) -> norm_rec fun_e
+                                  (function
+                                    | L3D d ->
+                                      maybe_let d
+                                        (function
+                                          | L3V fun_v ->
+                                            norm_arbitray_k args_es k (fun arg_vs -> L3App (fun_v, arg_vs))
+                                          | _ -> invalid_arg "expected to be a v")
+                                    | _ -> invalid_arg "expected to be a d")
     | L4NewArray (size_e, init_e) -> norm_biop_k size_e init_e k (fun l r -> L3NewArray (l, r))
-    | L4NewTuple vals_es -> L3D (L3V (L3Label "to do arbitray args"))
+    | L4NewTuple vals_es -> norm_arbitray_k vals_es k (fun x -> L3NewTuple x)
     | L4Aref (arr_e, pos_e) -> norm_biop_k arr_e pos_e k (fun l r -> L3Aref (l, r))
     | L4Aset (arr_e, pos_e, val_e) -> norm_ternary_k arr_e pos_e val_e k (fun x y z -> L3Aset (x, y, z))
+    | L4Alen (arr_e) -> norm_unary_k arr_e k (fun x -> L3Alen x)
     | L4Begin (fst_e, snd_e) -> norm_let_k (get_fresh_l3_var ()) fst_e snd_e k
     | L4MakeClosure (labl, v_e) -> norm_unary_k v_e k (fun v -> L3MakeClosure (labl, v))
     | L4ClosureProc arr_e -> norm_unary_k arr_e k (fun v -> L3ClosureProc v)
@@ -122,14 +131,28 @@ and norm_biop_k lhs_e rhs_e k what =
         | L3D d ->
           L3Let ((var_str, d), norm_rec body_e k)
         | _ -> invalid_arg "bind expected to be a d")
+  and norm_arbitray_k to_lift k what =
+    let rec norm_arbitrary_k_rec to_lift acc k =
+      match to_lift with
+      | [] -> k (List.rev acc)
+      | hd :: rst ->
+        norm_rec hd
+          (function
+            | L3D d ->
+              maybe_let d
+                (function
+                  | L3V v -> norm_arbitrary_k_rec rst (v :: acc) k
+                  | _ -> invalid_arg "expected to be a v")
+          | _ -> invalid_arg "expected to be a d")
+    in
+    norm_arbitrary_k_rec to_lift [] (fun res -> k (L3D (what res)))
   in
   let norm e = norm_rec e (fun e -> e) in
   norm l4_e
 
-
 let compile_l4_f = function
   | L4Fun (label, args, body_e) ->
-    L3Fun (label, args, compile_l4_e body_e)
+    L3Fun (label, (List.map l4_var_prefixer args), compile_l4_e body_e)
 
 let compile_l4_p = function
   | L4Prog (prog_e, fundefs) ->

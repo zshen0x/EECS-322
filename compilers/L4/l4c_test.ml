@@ -16,6 +16,8 @@ let test_compile_l4_e () =
                      L4Num Int64.zero)
   and l4_e9 = L4Begin (L4Num Int64.zero, L4Num Int64.one)
   and l4_e10 = L4Let (("tmp", L4Num Int64.zero), L4Print (L4Num Int64.one))
+  and l4_e11 = L4NewTuple [L4Num Int64.zero; L4Var "tmp"; L4Var "tmp"; L4Num Int64.one]
+  and l4_e12 = L4NewTuple [L4Var "tmp"; L4Var "var"; L4NumberQo (L4Label ":ksks"); L4Num Int64.one]
   in
   begin
     assert (compile_l4_e l4_e0 = L3D (L3V (L3Var "l4_myVar")));
@@ -37,6 +39,11 @@ let test_compile_l4_e () =
                                         L3D (L3V (L3Num Int64.one))));
     assert (compile_l4_e l4_e10 = L3Let (("l4_tmp", L3V (L3Num Int64.zero)),
                                          L3D (L3Print (L3Num Int64.one))));
+    assert (compile_l4_e l4_e11 = L3D (L3NewTuple [L3Num Int64.zero; L3Var "l4_tmp";
+                                                   L3Var "l4_tmp"; L3Num Int64.one]));
+    assert (compile_l4_e l4_e12 = L3Let (("l3_var0", L3NumberQo (L3Label ":ksks")),
+                                          L3D (L3NewTuple [L3Var "l4_tmp"; L3Var "l4_var";
+                                                           L3Var "l3_var0"; L3Num Int64.one])));
     print_endline "pass compile_l4_e tests"
   end
 

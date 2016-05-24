@@ -14,10 +14,10 @@ type d = L3Add of v * v
        | L3NewTuple of v list
        | L3Aref of v * v
        | L3Aset of v * v * v
+       | L3Alen of v
        | L3MakeClosure of string * v
        | L3ClosureProc of v
        | L3ClosureVars of v
-       | L3Alen of v
        | L3Print of v
        | L3V of v
        | L3Read
