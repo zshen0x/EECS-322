@@ -4,9 +4,9 @@ open Int64
 open Utils_l2
 
 (* f : sexpr list, var : string, prefix : string *)
-let spill_in_function f var prefix =
-  begin match f with
-  | l :: ag :: Atom spills :: rest ->
+let spill func_sexpr var prefix =
+  begin match func_sexpr with
+  | Expr (l :: ag :: Atom spills :: rest) ->
     let spills = int_of_string spills in
     let spills_n8 = string_of_int (spills * 8) in
     let is_var_to_spill s = (s = var) in
@@ -116,23 +116,19 @@ let spill_in_function f var prefix =
       | Expr [Atom c as call; Atom u; Atom nat]
         when ((c = "call" || c = "tail-call") && is_var_to_spill u) ->
         let suffix = string_of_int !counter in
-        let var_after_spill = prefix ^ suffix
-        in
-        incr counter;
-        Expr [Atom var_after_spill; Atom "<-"; Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]] ::
-        Expr [call; Atom var_after_spill; Atom nat] :: []
+        let var_after_spill = prefix ^ suffix in
+        begin
+          incr counter;
+          Expr [Atom var_after_spill; Atom "<-"; Expr [Atom "mem"; Atom "rsp"; Atom spills_n8]] ::
+          Expr [call; Atom var_after_spill; Atom nat] :: []
+        end
       | _ as inst -> [inst]
       (* assume no invalid input here*)
     in
     let spill_and_acc acc inst = List.append acc (spill_inst inst) in
-    l :: ag :: Atom (string_of_int (spills + 1)) :: List.fold_left spill_and_acc [] rest
+    Expr (l :: ag :: Atom (string_of_int (spills + 1)) :: List.fold_left spill_and_acc [] rest)
   | _ -> failwith "l2-spill: error: not a valid function"
   end
-
-let spill func_sexpr var prefix =
-  match func_sexpr with
-  | Expr f -> Expr (spill_in_function f var prefix)
-  | _ -> failwith "l2-spill: error: not a valid function s-expr"
 
 
 (* 

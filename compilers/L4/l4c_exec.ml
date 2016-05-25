@@ -3,7 +3,6 @@ open Parser_l4
 open Fmt_l3
 open L4c
 
-
 let () =
   match Sys.argv with
   | [|_; filename|] ->
