@@ -1,6 +1,10 @@
 
 let compose f g x = f (g x)
 
+let is_runtime_calls = function
+    "print" | "allocate" | "array-error" | "read" -> true
+  | _ -> false
+
 let is_integer s =
   try ignore(Int64.of_string s); true with Failure _ -> false;;
 

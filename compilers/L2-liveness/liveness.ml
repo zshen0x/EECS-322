@@ -13,68 +13,12 @@ module List = struct
       | hd :: rst -> hd :: take (n-1) rst
   end;;
 
-let compose f g x = f (g x)
-
-let is_integer s =
-  try ignore(Int64.of_string s); true with Failure _ -> false;;
-
-let is_aop = function
-    "+=" | "-=" | "*=" | "&=" -> true
-  | _ -> false
-
-let is_sop = function
-    "<<=" | ">>=" -> true
-  | _ -> false
-
-let is_cmp = function
-    "<" | "<=" |"=" -> true
-  | _ -> false
-
-let is_label s =
-  let r = Str.regexp "^:[a-zA-Z_][a-zA-Z_0-9]*$" in
-  Str.string_match r s 0
-
-let is_var = function
-  | "rsp" | "rcx" | "rdi" | "rsi" | "rdx" | "r8" 
-  | "r9" | "rax" | "rbx" | "rbp" | "r10" | "r11" 
-  | "r12" | "r13" | "r14" | "r15" -> false 
-  | _ as s -> let r = 
-    Str.regexp "^[a-zA-Z_][a-zA-Z_0-9-]*$" in
-    Str.string_match r s 0
-
-let is_sx s =
-  s = "rcx" || is_var s
-
-let is_a = function
-  | "rdi" | "rsi" | "rdx" | "r8" | "r9" -> true
-  | _ as s -> is_sx s
-
-let is_w = function
-  | "rax" | "rbx" | "rbp" | "r10" | "r11" | "r12" | "r13" | "r14" | "r15" -> true
-  | _ as s -> is_a s
-
-let is_x s = is_w s || s = "rsp"
-let is_u s = is_w s || is_label s
-let is_t s = is_x s || is_integer s
-let is_s s = is_x s || is_integer s || is_label s
-
-let is_cmp = function
-  | "<" | "<=" |"=" -> true
-  | _ -> false
-
-let is_op s = is_aop s || is_sop s
-
-let caller_save = ["r10"; "r11"; "r8"; "r9"; "rax"; "rcx"; "rdi"; "rdx"; "rsi"]
-let args = ["rdi"; "rsi"; "rdx"; "rcx"; "r8"; "r9"]
-let callee_save = ["r12"; "r13"; "r14"; "r15"; "rbp"; "rbx"]
-let result = ["rax"]
-
 (* type gen_and_kill = {size : int; gens : SS.t array; kills : SS.t array} *)
 type two_sets = {size : int; first : SS.t array; second : SS.t array}
 
 let calc_gen_and_kill insts_arr =
   (* exclude rsp *)
-  let foo s = if is_w s then [s] else [] in
+  let foo s = if not (is_runtime_calls s) && is_w s then [s] else [] in
   let gen_and_kill_each_inst = function
     | Expr [Atom w; Atom "<-"; Atom s] ->
       let gen = foo s and kill = [w] in
@@ -97,6 +41,7 @@ let calc_gen_and_kill insts_arr =
     | Expr [Atom "cjump"; Atom t1; Atom cmp; Atom t2; Atom lable1; Atom lable2] ->
       let gen = foo t1 @foo t2 and kill = [] in
       (SS.of_list gen, SS.of_list kill)
+  (*
     | Expr [Atom "call"; Atom "print"; Atom "1"] ->
       let gen = List.take 1 args and kill = caller_save @result in
       (SS.of_list gen, SS.of_list kill)
@@ -106,6 +51,7 @@ let calc_gen_and_kill insts_arr =
     | Expr [Atom "call"; Atom "array-error"; Atom "2"] ->
       let gen = List.take 2 args and kill = caller_save @result in
       (SS.of_list gen, SS.of_list kill)
+  *)
     | Expr [Atom "call"; Atom u; Atom nat] ->
       let n = min (int_of_string nat) 6 in
       let gen = List.take n args @foo u and kill = caller_save @result in
@@ -124,12 +70,16 @@ let calc_gen_and_kill insts_arr =
   in
   let len = Array.length insts_arr in
   let gen_and_kill_sets = {size=len; first=Array.make len SS.empty; second=Array.make len SS.empty} in
-  begin for i = 0 to len - 1 do
-    let sets = gen_and_kill_each_inst insts_arr.(i) in
-    let gen = fst sets and kill = snd sets in
-    gen_and_kill_sets.first.(i) <- gen; gen_and_kill_sets.second.(i) <- kill
-  done;
-  gen_and_kill_sets
+  begin
+    for i = 0 to len - 1 do
+      let sets = gen_and_kill_each_inst insts_arr.(i) in
+      let gen = fst sets and kill = snd sets in
+      begin
+        gen_and_kill_sets.first.(i) <- gen;
+        gen_and_kill_sets.second.(i) <- kill
+      end
+    done;
+    gen_and_kill_sets
   end
 
 let calc_label_table insts_arr =
@@ -194,7 +144,7 @@ let print_sets set_arr name =
   print_endline ("(" ^ name);
   print_string (output ^ ")")
 
-let print_two_sests {size; first; second} n1 n2=
+let print_two_sests {size; first; second} n1 n2 =
   begin
   print_string "(";
   print_newline (print_sets first n1);

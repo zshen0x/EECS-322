@@ -1,4 +1,4 @@
 #!/bin/sh
 
-/home/software/racket-6.4/bin/racket $(dirname $0)/spill-format.rkt "$@" | ./spill_exec.native
+racket $(dirname $0)/spill-format.rkt "$@" | ./spill_exec.native
 
