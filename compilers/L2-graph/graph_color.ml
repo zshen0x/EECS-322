@@ -13,16 +13,6 @@ module G = Graph.Imperative.Graph.Concrete
 
 module StrMap = Map.Make(String)
 
-let args = ["rdi"; "rsi"; "rdx"; "rcx"; "r8"; "r9"]
-let result = ["rax"]
-let caller_save = ["r10"; "r11"; "r8"; "r9"; "rax"; "rcx"; "rdi"; "rdx"; "rsi"]
-let calee_save = ["r12"; "r13"; "r14"; "r15"; "rbp"; "rbx"]
-let all_registers = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
-                     "r9"; "rax"; "rbp"; "rbx"; "rcx"; "rdi"; "rdx"; "rsi"]
-let all_registers_except_rcx = ["r10"; "r11"; "r12"; "r13"; "r14"; "r15"; "r8";
-                                "r9"; "rax"; "rbp"; "rbx"; "rdi"; "rdx"; "rsi"]
-
-
 let build_interference_graph inst_arr =
   let gen_and_kill_sets = calc_gen_and_kill inst_arr in
   let in_and_out_sets = calc_in_and_out inst_arr in
