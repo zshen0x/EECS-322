@@ -103,13 +103,3 @@ let compile_program = function
     | None -> None
     end
   | _ -> failwith "l2c: Program is not well formed"
-
-let () =
-  match Sys.argv with
-  | [|_; filename|] ->
-    let print_result = function
-      | Some l2_prog -> SExpr.print_sexpr_indent [l2_prog]
-      | None -> print_endline "\"could not register allocate\""
-    in
-    List.iter (fun p -> print_result @@ compile_program p) (parse_file filename)
-  | _ -> ()
