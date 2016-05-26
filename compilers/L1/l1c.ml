@@ -23,6 +23,7 @@ type l1 = Mem of l1 * l1
         | Tail_call of l1 * l1 * int64 * int64 (* callee function args and spillls *)
         | Return of int64 * int64
         | Print
+        | Read
         | Allocate
         | ArrayError
         | Reg of string
@@ -146,6 +147,7 @@ let parse_func_sexpr = function
             Cjmp (parse_inst_sexpr t0, cmp, parse_inst_sexpr t1,
                   parse_inst_sexpr lb0, parse_inst_sexpr lb1)
           | Expr (Atom "call" :: Atom "print" :: Atom "1" :: []) -> Print
+          | Expr [Atom "call"; Atom "read"; Atom "0"] -> Read
           | Expr (Atom "call" :: Atom "allocate" :: Atom "2" :: []) -> Allocate
           | Expr (Atom "call" :: Atom "array-error" :: Atom "2" :: []) -> ArrayError
           | Expr (Atom "call" :: (Atom ustr as u) :: (Atom nstr as n) :: [])
@@ -247,6 +249,7 @@ let compile_l1 = function
     ^ "jmp " ^ compile_rnlm labl
       (* "function can only be called at tail position when they have 6 or fewer args so not args in stack "*)
   | Print -> "call print"
+  | Read -> "call read"
   | Allocate -> "call allocate"
   | ArrayError -> "call array_error"
   | Return (args, spills) ->
@@ -265,7 +268,7 @@ let compile_func = function
     (inst0 ^ inst1) :: List.map compile_l1 rest
   | _ -> failwith "l1c error: not a valid form of valid l1 list function in compile_func"
 
-let compile_prog = function
+let compile_l1_prog = function
   | Expr (Atom lb :: fun_lst) when is_label lb ->
     let lb = String.sub lb 1 ((String.length lb) - 1) in
     let part0 = "    .text\n    .globl go\ngo:\n" in
@@ -277,7 +280,7 @@ let compile_prog = function
 
 (* compile your file here *)
 let compile = function
-  | hd :: [] -> compile_prog hd (* one file one program only *)
+  | hd :: [] -> compile_l1_prog hd (* one file one program only *)
   | _ -> failwith "l1c error: not a valid program structure \
                    this file containnig more than one program"
 
@@ -288,6 +291,7 @@ let output_file clst file =
   close_out oc
 ;;
 
+(* 
 let test_cases1 () =
   let inst0 = Mov ((Mem ((Reg "rsp"), (Number (Int64.of_int (-8))))), (Reg "r10b"))
   and inst1 = Goto (Label":next")
@@ -433,9 +437,4 @@ let test_cases4 () =
 
 let run_test () =
   test_cases1 ()
-
-let () =
-  let len = Array.length Sys.argv in
-  match len with
-  | 2 -> output_file (compile (parse_file Sys.argv.(1))) "prog.S"
-  | _ -> run_test ()
+*)
