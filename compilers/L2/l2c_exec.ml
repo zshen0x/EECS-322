@@ -8,5 +8,5 @@ let () =
       | Some l2_prog -> SExpr.print_sexpr_indent [l2_prog]
       | None -> print_endline "\"could not register allocate\""
     in
-    List.iter (fun p -> print_result @@ compile_program p) (parse_file filename)
+    List.iter (fun p -> print_result @@ compile_l2_prog p) (parse_file filename)
   | _ -> ()

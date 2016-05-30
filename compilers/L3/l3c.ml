@@ -1,5 +1,4 @@
 open SExpr
-open Parser_l3
 open AST_l3
 open FrontEndUtils
 
@@ -52,7 +51,7 @@ Other non-terminals (e.g., label, var) are given in lecture02 and lecture04.
 let l3_var_prefix = "l3_var"
 and l3_label_prefix = "l3_label_"
 and l3_entry = ":main"
-and fresh_l2_label_prefix = ":label_"
+and fresh_l2_label_prefix = ":l2_label"
 and result_reg = Atom "rax"
 and tmp_var = Atom "tmp" (* only used in bounds check and must init every usssage and could be used multiple times *)
 
@@ -353,18 +352,10 @@ let compile_l3_f l3_fun_label_prefixer l3_label_prefixer get_fresh_l2_label = fu
 (** all other label (labels are global unique ) except :main should be renamed with prefix *)
 let compile_l3_p = function
   | L3Prog (entry_e, fundefs) ->
-    let l2_label_cnt = ref 0 in
-    let get_fresh_l2_label () =
-      (* label global to program *)
-      let labl = fresh_l2_label_prefix ^ string_of_int !l2_label_cnt in
-      begin
-        incr l2_label_cnt;
-        labl
-      end
+    let get_fresh_l2_label = get_unique_str_generator fresh_l2_label_prefix
     and l3_label_prefixer labl =
       ":" ^ l3_label_prefix ^ String.sub labl 1 ((String.length labl) - 1)
-    and identical i = i
-    in
+    and identical i = i in
     let entry_fun = L3Fun (l3_entry, [], entry_e)
     and fs = List.map (compile_l3_f l3_label_prefixer l3_label_prefixer get_fresh_l2_label) fundefs in
     Expr (Atom l3_entry :: (compile_l3_f identical l3_label_prefixer get_fresh_l2_label entry_fun) :: fs)

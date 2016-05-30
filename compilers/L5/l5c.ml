@@ -3,6 +3,7 @@ open AST_l4
 open FrontEndUtils
 
 module SS = Set.Make(String)
+module SMap = Map.Make(String)
 
 let l5_var_prefix = "l5_var"
 and l4_var_prefix = "l4_var"
@@ -240,5 +241,6 @@ let compile_l5 e =
     in
     (l4_app_expr, fs @ l4_fundefs)
   in
-  let prog_e, fundefs = compile_l5_e_recr [] e in
+  let prog_e, fundefs =
+    compile_l5_e_recr [] e in
   L4Prog (prog_e, fundefs)

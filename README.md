@@ -13,4 +13,4 @@ Steps
  * cps (compile with continuation)
 * L5 -> L4
  * recursive binding
- * lambda (λ)
+ * lambda (λ) (closure conversion)

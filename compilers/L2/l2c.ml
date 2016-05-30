@@ -77,7 +77,7 @@ let compile_function prefix f_expr =
     coloring_spill_loop f_expr ig vars spills_str insts
   | _ -> failwith "l2c: register allocation: not a valid function expression"
 
-let compile_program = function
+let compile_l2_prog = function
   | Expr (p_label :: f_lst) ->
     let rec fold_left_until_none f lst acc =
       begin match lst with
@@ -103,3 +103,8 @@ let compile_program = function
     | None -> None
     end
   | _ -> failwith "l2c: Program is not well formed"
+
+let compile_l2 l2_e =
+  match compile_l2_prog l2_e with
+  | Some l1_e -> l1_e
+  | None -> failwith "l2c: program can not be compiled to l1"

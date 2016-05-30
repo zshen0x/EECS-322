@@ -12,19 +12,10 @@ let is_l3_val = function
   | L3V _ -> true
   | _ -> false
 
-let get_fresh_var_generator prefix =
-  let var_cnt = ref 0 in
-  fun () ->
-    let l3_var = prefix ^ string_of_int !var_cnt in
-    begin
-      incr var_cnt;
-      l3_var
-    end
-
 (* l4_e k -> l3_e *)
 (* fill d k = k d so eliminate fill *)
 let compile_l4_e l4_e =
-  let get_fresh_l3_var = get_fresh_var_generator l3_var_prefix in
+  let get_fresh_l3_var = get_unique_str_generator l3_var_prefix in
   let maybe_let d f =
     match d with
     | L3V v -> f d
@@ -195,7 +186,7 @@ let rename_var_l4_e get_fresh_l4_var l4_var_map l4_e =
 
 let rename_var_l4_f = function
   | L4Fun (labl, args, body_e) ->
-    let get_fresh_l4_var = get_fresh_var_generator l4_var_prefix in
+    let get_fresh_l4_var = get_unique_str_generator l4_var_prefix in
     let l4_var_map = Hashtbl.create (List.length args) in
     let rename_l4_args l4_var =
       try
@@ -215,7 +206,7 @@ let compile_l4_p = function
   | L4Prog (prog_e, fundefs) ->
     (* preprocessing happen here *)
     let processed_prog_e =
-      rename_var_l4_e (get_fresh_var_generator l4_var_prefix) (Hashtbl.create 0) prog_e in
+      rename_var_l4_e (get_unique_str_generator l4_var_prefix) (Hashtbl.create 0) prog_e in
     let processed_fundefs = List.map rename_var_l4_f fundefs in
     L3Prog (compile_l4_e processed_prog_e,
             List.map compile_l4_f processed_fundefs)
