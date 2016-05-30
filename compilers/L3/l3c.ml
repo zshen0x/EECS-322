@@ -97,6 +97,7 @@ let rec compile_l3_d get_fresh_l2_label my_compile_l3_v dst inst_d =
     Expr [tmp_var; Atom "<-"; Expr [Atom "mem"; arr_sexpr; Atom "0"]] ::
     Expr [Atom "cjump"; dst; Atom "<"; tmp_var; bounds_pass_label; bounds_fail_label] ::
     bounds_fail_label ::
+    Expr [tmp_var; Atom "<-"; Atom "1"] :: (* garbeage collection *)
     Expr [Atom "rdi"; Atom "<-"; arr_sexpr] ::
     Expr [Atom "rsi"; Atom "<-"; pos_sexpr] ::
     Expr [Atom "call"; Atom "array-error"; Atom "2"] ::
