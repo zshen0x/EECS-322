@@ -12,6 +12,11 @@ and vars_tup = "vars_tups"
 
 (* AST_l5_e -> AST_l4_prog *)
 
+(*
+  TODO 1. grammar check for prime not enough argument
+
+*)
+
 let compile_l5 e =
   (* let get_fresh_l5_var = get_unique_str_generator l5_var_prefix in *)
   let get_fresh_l4_var = get_unique_str_generator l4_var_prefix
@@ -113,7 +118,7 @@ let compile_l5 e =
     | App (f, args) ->
       SS.union (get_free_variables f) (accmulate_lst args)
     | Fn (vars, e) ->
-      SS.diff (get_free_variables e) (SS.of_list vars) 
+      SS.diff (get_free_variables e) (SS.of_list vars)
     | _ -> SS.empty (* we assume program are correct and thus we ignore free variables in labmda body *)
   and replace_l5_e target replacement expr =
     let replace_e = replace_l5_e target replacement in
@@ -169,47 +174,47 @@ let compile_l5 e =
       begin match p with
         | Add ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4Add (lhs, rhs)
+            | [lhs; rhs] -> L4Add (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | Sub ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4Sub (lhs, rhs)
+            | [lhs; rhs] -> L4Sub (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | Mul ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4Mul (lhs, rhs)
+            | [lhs; rhs] -> L4Mul (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | Less ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4Less (lhs, rhs)
+            | [lhs; rhs] -> L4Less (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | LessEq ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4LessEq (lhs, rhs)
+            | [lhs; rhs] -> L4LessEq (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | Equal ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4Equal (lhs, rhs)
+            | [lhs; rhs] -> L4Equal (lhs, rhs)
             | _ -> failwith "l5c: biop require 2 operand"
           end
         | NumberQo ->
           begin match l4_args with
-            | any :: [] -> L4NumberQo any
+            | [any] -> L4NumberQo any
             | _ -> failwith "l5c: pred require 1 operand"
           end
         | AQo ->
           begin match l4_args with
-            | any :: [] -> L4AQo any
+            | [any] -> L4AQo any
             | _ -> failwith "l5c: pred require 1 operand"
           end
         | Print ->
           begin match l4_args with
-            | any :: [] -> L4Print any
+            | [any] -> L4Print any
             | _ -> failwith "l5c: print require 1 operand"
           end
         | Read ->
@@ -219,22 +224,22 @@ let compile_l5 e =
           end
         | NewArray ->
           begin match l4_args with
-            | lhs :: rhs :: [] -> L4NewArray (lhs, rhs)
+            | [size; init] -> L4NewArray (size, init)
             | _ -> failwith "l5c: new-array require 2 operand"
           end
         | Aref ->
           begin match l4_args with
-            | arr :: pos :: [] -> L4Aref (arr, pos)
+            | [arr; pos] -> L4Aref (arr, pos)
             | _ -> failwith "l5c: aref require 2 operand"
           end
         | Aset ->
           begin match l4_args with
-            | arr :: pos :: value :: [] -> L4Aset (arr, pos, value)
+            | [arr; pos; value] -> L4Aset (arr, pos, value)
             | _ -> failwith "l5c: aset require 3 operand"
           end
         | Alen ->
           begin match l4_args with
-            | arr :: [] -> L4Alen arr
+            | [arr] -> L4Alen arr
             | _ -> failwith "l5c: alen require 1 operand"
           end
       end

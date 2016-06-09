@@ -27,7 +27,7 @@ let compile_inst spills replace = function
     Expr [Atom (replace w); Atom "<-";
           Expr [Atom "mem"; Atom "rsp";
                 Atom (string_of_int (8 * spills + n8))]]
-  | _ as i -> i
+  | els -> els
 
 
 (* register allocation work here *)

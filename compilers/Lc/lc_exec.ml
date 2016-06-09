@@ -19,10 +19,11 @@ let () =
         L4c.compile_l4_p @@
         L5c.compile_l5 @@
         parse_l5_e p in
-      let asms = List.map compile_chain (parse_file filename) in
-      match asms with
+      let asm = List.map compile_chain (parse_file filename) in
+      (* print_sexpr_indent asm *)
+      match asm with
       | hd :: [] -> output_file hd "prog.S"
-      | _ -> failwith "lc: wrong argment"
+      | _ -> failwith "lc: wrong program: too many"
     in
     lc_compiler filename
   | _ -> ()

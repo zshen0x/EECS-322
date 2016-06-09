@@ -181,7 +181,7 @@ let rec compile_rnlm = function
 let compile_l1 = function
   | Label s -> "_" ^ String.sub s 1 ((String.length s) - 1) ^ ":" (*this case should only work for when inst is lb*)
 (*| Reg reg -> "%" ^ reg
-  | Number num -> "$" ^ string_of_int num 
+  | Number num -> "$" ^ string_of_int num
   | Mem (reg, Number off) -> string_of_int off ^ "(" ^ compile_rnlm reg ^ ")" *)
   | Mov (Label lb as src, dest) -> "movq $" ^ compile_rnlm src ^ ", " ^ compile_rnlm dest
   | Mov (src, dest) -> "movq " ^ compile_rnlm src ^ ", " ^ compile_rnlm dest
@@ -286,12 +286,12 @@ let compile = function
 
 let output_file clst file =
   let oc = open_out file in
-  let prog_out = compose (output_string oc) (compose (Printf.sprintf "%s\n") (String.concat "\n")) in
+  let prog_out = compose (output_string oc) (compose (Printf.sprintf "%s\n\n") (String.concat "\n")) in
   List.iter prog_out clst;
   close_out oc
 ;;
 
-(* 
+(*
 let test_cases1 () =
   let inst0 = Mov ((Mem ((Reg "rsp"), (Number (Int64.of_int (-8))))), (Reg "r10b"))
   and inst1 = Goto (Label":next")
