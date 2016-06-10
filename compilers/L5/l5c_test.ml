@@ -2,7 +2,6 @@ open SExpr
 open Parser_l5
 open AST_l5
 
-
 let run_parser_tests () =
   let t0 = Atom "+"
   and t1 = Atom "-"

@@ -3,7 +3,7 @@ open AST_l4
 open FrontEndUtils
 
 module SS = Set.Make(String)
-module SMap = Map.Make(String)
+module StrMap = Map.Make(String)
 
 let l5_var_prefix = "l5_var"
 and l4_var_prefix = "l4_var"
@@ -14,8 +14,50 @@ and vars_tup = "vars_tups"
 
 (*
   TODO 1. grammar check for prime not enough argument
-
 *)
+
+let alpha_renaming =
+  let get_fresh_l5_var = get_unique_str_generator l5_var_prefix in
+  let lookup v mapping =
+    try StrMap.find v mapping
+    with Not_found -> failwith "unbound variable: " ^ v
+  in
+  let rec alpha_renaming_recr mapping = function
+    | X x -> X (lookup x mapping)
+  | Let ((var, e1), e2) ->
+    let alpha = get_fresh_l5_var () in
+    Let ((alpha, alpha_renaming_recr mapping e1),
+         alpha_renaming_recr (StrMap.add var alpha mapping) e2)
+  | LetRec ((var, e1), e2) ->
+    let alpha = get_fresh_l5_var () in
+    let mapping = StrMap.add var alpha mapping in
+    LetRec ((alpha, alpha_renaming_recr mapping e1),
+        alpha_renaming_recr mapping e2)
+  | If (e1, e2, e3) ->
+    If (alpha_renaming_recr mapping e1,
+        alpha_renaming_recr mapping e2,
+        alpha_renaming_recr mapping e3)
+  | Begin (e1, e2) ->
+    Begin (alpha_renaming_recr mapping e1,
+           alpha_renaming_recr mapping e2)
+  | NewTuple initials ->
+    NewTuple (List.map (alpha_renaming_recr mapping) initials)
+  | App (f, l5_args) ->
+    App (alpha_renaming_recr mapping f,
+         List.map (alpha_renaming_recr mapping) l5_args)
+  | Fn (vars, e) ->
+    let rev_vars, mapping =
+      List.fold_left
+        (fun acc v ->
+           let alpha_vars, mapping = acc in
+           let alpha = get_fresh_l5_var () in
+           (alpha :: alpha_vars, StrMap.add v alpha mapping)) ([], mapping) vars
+    in
+    let alpha_vars = List.rev rev_vars in
+    Fn (alpha_vars, alpha_renaming_recr mapping e)
+  | els -> els
+  in
+  alpha_renaming_recr StrMap.empty
 
 let compile_l5 e =
   (* let get_fresh_l5_var = get_unique_str_generator l5_var_prefix in *)
@@ -247,5 +289,6 @@ let compile_l5 e =
     (l4_app_expr, fs @ l4_fundefs)
   in
   let prog_e, fundefs =
-    compile_l5_e_recr [] e in
+    compile_l5_e_recr [] (alpha_renaming e)
+  in
   L4Prog (prog_e, fundefs)

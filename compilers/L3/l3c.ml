@@ -53,7 +53,7 @@ and l3_label_prefix = "l3_label_"
 and l3_entry = ":main"
 and fresh_l2_label_prefix = ":l2_label"
 and result_reg = Atom "rax"
-and tmp_var = Atom "tmp" (* only used in bounds check and must init every usssage and could be used multiple times *)
+and tmp_var = Atom "l2_tmp" (* only used in bounds check and must init every usssage and could be used multiple times *)
 
 (* label are globally visible *)
 let get_fresh_l2_label = get_unique_str_generator fresh_l2_label_prefix
@@ -94,21 +94,22 @@ let rec compile_l3_d my_compile_l3_v dst inst_d =
     let non_negtive_label = Atom (get_fresh_l2_label ())
     and bounds_pass_label = Atom (get_fresh_l2_label ())
     and bounds_fail_label = Atom (get_fresh_l2_label ()) in
-    Expr [dst; Atom "<-"; pos_sexpr] ::
-    Expr [dst; Atom ">>="; Atom "1"] ::
-    Expr [Atom "cjump"; dst; Atom "<"; Atom "0"; bounds_fail_label; non_negtive_label] ::
-    non_negtive_label ::
-    Expr [tmp_var; Atom "<-"; Expr [Atom "mem"; arr_sexpr; Atom "0"]] ::
-    Expr [Atom "cjump"; dst; Atom "<"; tmp_var; bounds_pass_label; bounds_fail_label] ::
-    bounds_fail_label ::
-    Expr [tmp_var; Atom "<-"; Atom "1"] :: (* garbeage collection *)
-    Expr [dst; Atom "<-"; Atom "1"] ::
-    Expr [Atom "rdi"; Atom "<-"; arr_sexpr] ::
-    Expr [Atom "rsi"; Atom "<-"; pos_sexpr] ::
-    Expr [Atom "call"; Atom "array-error"; Atom "2"] ::
-    bounds_pass_label ::
-    Expr [tmp_var; Atom "<-"; Atom "1"] :: (* garbeage collection *)
-    []
+    [
+      Expr [dst; Atom "<-"; pos_sexpr];
+      Expr [dst; Atom ">>="; Atom "1"];
+      Expr [Atom "cjump"; dst; Atom "<"; Atom "0"; bounds_fail_label; non_negtive_label];
+      non_negtive_label;
+      Expr [tmp_var; Atom "<-"; Expr [Atom "mem"; arr_sexpr; Atom "0"]];
+      Expr [Atom "cjump"; dst; Atom "<"; tmp_var; bounds_pass_label; bounds_fail_label];
+      bounds_fail_label;
+      Expr [tmp_var; Atom "<-"; Atom "1"];  (* garbeage collection *)
+      Expr [dst; Atom "<-"; Atom "1"];
+      Expr [Atom "rdi"; Atom "<-"; arr_sexpr];
+      Expr [Atom "rsi"; Atom "<-"; pos_sexpr];
+      Expr [Atom "call"; Atom "array-error"; Atom "2"];
+      bounds_pass_label;
+      Expr [tmp_var; Atom "<-"; Atom "1"] (* garbeage collection *)
+    ]
   in
   let assign_vars_to_args vars_sexprs vars_len args_len =
     let vars_arr = Array.of_list vars_sexprs
@@ -271,22 +272,21 @@ let rec compile_l3_e l3_label_prefixer l3_var_map get_fresh_l3_var l3_e =
       (fun v ->
          try Hashtbl.find l3_var_map v
          with Not_found ->
-           failwith (v ^ " is not found"))
+           failwith "l3c: unbound variable: " ^ v)
   in
   match l3_e with
   | L3Let ((var_str, inst_d), body_e) when is_var var_str ->
     (* binding not in tail position *)
     (* dst_v must be a var *)
-    let l3_dst = var_str
-    and l2_dst = get_fresh_l3_var () in
-    let bind_insts = compile_l3_d my_compile_l3_v (Atom l2_dst) inst_d in
+    let nvar_str = get_fresh_l3_var () in
+    let bind_insts = compile_l3_d my_compile_l3_v (Atom nvar_str) inst_d in
     begin
-      Hashtbl.add l3_var_map l3_dst l2_dst; (** add new binding to shadow when evaluate body_e *)
+      Hashtbl.add l3_var_map var_str nvar_str; (** add new binding to shadow when evaluate body_e *)
       let body_insts =
         compile_l3_e l3_label_prefixer l3_var_map get_fresh_l3_var body_e in
       begin
         (* to avoid copy hashtable in restore the mapping *)
-        Hashtbl.remove l3_var_map l3_dst;
+        Hashtbl.remove l3_var_map var_str;
         bind_insts @ body_insts
       end
     end
@@ -319,10 +319,10 @@ let compile_l3_f l3_fun_label_prefixer l3_label_prefixer = function
       try
         Hashtbl.find l3_var_map l3_var
       with Not_found ->
-        let l2_var = get_fresh_l3_var () in
+        let nvar = get_fresh_l3_var () in
         begin
-          Hashtbl.add l3_var_map l3_var l2_var;
-          l2_var
+          Hashtbl.add l3_var_map l3_var nvar;
+          nvar
         end
     in
     let my_compile_l3_v = compile_l3_v_generator l3_label_prefixer rename_l3_args in
