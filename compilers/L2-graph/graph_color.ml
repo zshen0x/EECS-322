@@ -13,6 +13,20 @@ module G = Graph.Imperative.Graph.Concrete
 
 module StrMap = Map.Make(String)
 
+
+let color_map_to_list map =
+  StrMap.fold (fun k v acc -> (k, v) :: acc) map []
+  |> List.rev
+  |> List.map (fun (k, v) -> "(" ^ k ^ " " ^ v ^ ")")
+
+let print_graph ig =
+  let acc v lst =
+    ("(" ^ String.concat " " (v :: (G.succ ig v)) ^ ")") :: lst in
+  let g_sort_lst = G.fold_vertex acc ig [] |> List.sort G.V.compare in
+  "(" ^ String.concat "\n" g_sort_lst ^ ")"
+  |> print_endline
+
+
 let build_interference_graph inst_arr =
   let gen_and_kill_sets = calc_gen_and_kill inst_arr in
   let in_and_out_sets = calc_in_and_out inst_arr in
@@ -75,71 +89,76 @@ let graph_color original_ig =
   let nb_colors = List.length all_registers in
   let vertex_to_remove a_ig =
     let fold_f v res =
+      if is_var v then
       let degree = G.out_degree a_ig v in
       match res with
       | Some (_, res_degree) ->
         if degree < nb_colors && degree > res_degree then Some (v, degree) else res
       | None ->
         if degree < nb_colors then Some (v, degree) else res
+      else
+        res
     in
     G.fold_vertex fold_f a_ig None
   in
   (* generate nodes serials *)
   let rec pick_nodes_recr mut_ig a_stack =
     (* try to remove all the nodes *)
-    if G.is_empty mut_ig then
+    if G.nb_vertex mut_ig = List.length all_registers then
       Some a_stack
     else begin
       match vertex_to_remove mut_ig with
-      | Some (v, _) -> begin
-          Stack.push (v, G.succ original_ig v) a_stack;
+      | Some (v, d) -> begin
+          (* print_endline ("node: " ^ v ^ " degree: " ^ string_of_int d);
+          List.iter (fun s -> print_string (s ^ " ")) (G.succ original_ig v);
+          print_newline ();
+          List.iter (fun s -> print_string (s ^ " ")) (G.succ mut_ig v);
+             print_newline (); *)
+          Stack.push (v, G.succ mut_ig v) a_stack;
           G.remove_vertex mut_ig v;
           pick_nodes_recr mut_ig a_stack
         end
       | None -> None
     end
   in
-  let rec generate_mapping_recr var_mapping all_mapping a_stack =
-    if Stack.is_empty a_stack then var_mapping
-    else begin let v, succs = Stack.pop a_stack in
+  let rec generate_mapping_recr reg_m a_stack =
+    if Stack.is_empty a_stack then
+      StrMap.filter (fun k v -> is_var k) reg_m
+    else begin
+      let v, succs = Stack.pop a_stack in
       if is_var v then begin
         let pred e =
           let f acc e =
-            try SS.add (StrMap.find e all_mapping) acc
-          with Not_found -> acc
+            try SS.add (StrMap.find e reg_m) acc
+            with Not_found -> failwith ("graph_color: generate_mapping_recr: error " ^ e ^ " not found")
           in
           let assigned_colors = List.fold_left f SS.empty succs in
           not (SS.mem e assigned_colors)
         in
-        let color = List.find pred all_registers in
-        let new_var_mapping = StrMap.add v color var_mapping
-        and new_all_mapping = StrMap.add v color all_mapping in
-        generate_mapping_recr new_var_mapping new_all_mapping a_stack
+        let color =
+          try List.find pred all_registers
+          with Not_found ->
+            begin
+              print_graph original_ig;
+              failwith ("graph_color: generate_mapping_recr: " ^ "error: when mapping variable: " ^ v)
+            end
+        in
+        let nreg_m = StrMap.add v color reg_m in
+        begin
+          (* print_endline ("assign variable: " ^ v ^ " to register: " ^ color); *)
+          generate_mapping_recr nreg_m a_stack
+        end
       end
       else
-        generate_mapping_recr var_mapping all_mapping a_stack
+        generate_mapping_recr (StrMap.add v v reg_m) a_stack
     end
   in
-  (* sanity for check*)
+  (* for sanity  check*)
   let mut_ig = G.copy original_ig in
   let init_mapping = List.fold_left (fun acc e -> StrMap.add e e acc) StrMap.empty all_registers in
   match pick_nodes_recr mut_ig (Stack.create ()) with
-  | Some a_stack -> Some (generate_mapping_recr StrMap.empty init_mapping a_stack)
+  | Some a_stack -> Some (generate_mapping_recr init_mapping a_stack)
   | None -> None
-
-
-let color_map_to_list map =
-  StrMap.fold (fun k v acc -> (k, v) :: acc) map []
-  |> List.rev
-  |> List.map (fun (k, v) -> "(" ^ k ^ " " ^ v ^ ")")
-
-
-let print_graph ig =
-  let acc v lst =
-    ("(" ^ String.concat " " (v :: (G.succ ig v)) ^ ")") :: lst in
-  let g_sort_lst = G.fold_vertex acc ig [] |> List.sort G.V.compare in
-  "(" ^ String.concat "\n" g_sort_lst ^ ")"
-  |> print_endline
 
 
 (*

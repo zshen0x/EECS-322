@@ -123,21 +123,21 @@ let compile_l5 e =
     | Fn (vars, e) as fn ->
       let free_variables = SS.elements (get_free_variables fn) in
       let cnt = ref 0 in
-      let rec add_bounds l4_e = function
+      let rec unpack_free_vars l4_e = function
         | [] -> l4_e
         | hd :: rst ->
           let pos = L4Num (Int64.of_int !cnt) in
           begin
             incr cnt;
             L4Let ((hd, L4Aref (L4Var vars_tup, pos)),
-                   add_bounds l4_e rst)
+                   unpack_free_vars l4_e rst)
           end
       in
       let l4_body_e, l4_fs = compile_l5_e_recr [] e in
       let fn_labl = get_fresh_fn_label () in
       (
         L4MakeClosure (fn_labl, (L4NewTuple (List.map (fun v -> L4Var v) free_variables))),
-        L4Fun (fn_labl, vars_tup :: vars, add_bounds l4_body_e free_variables)
+        L4Fun (fn_labl, vars_tup :: vars, unpack_free_vars l4_body_e free_variables)
         :: (l4_fs @ l4_fundefs)
       )
     | _ -> invalid_arg "l5c: lift_lambda: must be a l5 Fn"
@@ -161,7 +161,7 @@ let compile_l5 e =
       SS.union (get_free_variables f) (accmulate_lst args)
     | Fn (vars, e) ->
       SS.diff (get_free_variables e) (SS.of_list vars)
-    | _ -> SS.empty (* we assume program are correct and thus we ignore free variables in labmda body *)
+    | _ -> SS.empty
   and replace_l5_e target replacement expr =
     let replace_e = replace_l5_e target replacement in
     begin match expr with

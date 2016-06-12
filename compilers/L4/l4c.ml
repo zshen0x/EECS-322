@@ -145,44 +145,46 @@ let compile_l4_f = function
     L3Fun (labl, args, compile_l4_e body_e)
 
 
-let rename_var_l4_e get_fresh_l4_var l4_var_map l4_e =
-  let rec rename_var_e = function
-    | L4Var v -> L4Var (Hashtbl.find l4_var_map v)
-    | L4Add (l, r) -> L4Add (rename_var_e l, rename_var_e r)
-    | L4Sub (l, r) -> L4Sub (rename_var_e l, rename_var_e r)
-    | L4Mul (l, r) -> L4Mul (rename_var_e l, rename_var_e r)
-    | L4Less (l, r) -> L4Less (rename_var_e l, rename_var_e r)
-    | L4LessEq (l, r) -> L4LessEq (rename_var_e l, rename_var_e r)
-    | L4Equal (l, r) -> L4Equal (rename_var_e l, rename_var_e r)
-    | L4NumberQo e -> L4NumberQo (rename_var_e e)
-    | L4AQo e -> L4AQo (rename_var_e e)
-    | L4App (f, args) -> L4App (rename_var_e f, (List.map rename_var_e args))
-    | L4NewArray (l, r) -> L4NewArray (rename_var_e l, rename_var_e r)
-    | L4NewTuple vals -> L4NewTuple (List.map rename_var_e vals)
-    | L4Aref (l, r) -> L4Aref (rename_var_e l, rename_var_e r)
-    | L4Aset (e1, e2, e3) -> L4Aset (rename_var_e e1, rename_var_e e2, rename_var_e e3)
-    | L4Alen e -> L4Alen (rename_var_e e)
-    | L4Begin (e1, e2) -> L4Begin (rename_var_e e1, rename_var_e e2)
-    | L4Print e -> L4Print (rename_var_e e)
-    | L4MakeClosure (labl, e) -> L4MakeClosure (labl, rename_var_e e)
-    | L4ClosureProc e -> L4ClosureProc (rename_var_e e)
-    | L4ClosureVars e -> L4ClosureVars (rename_var_e e)
-    | L4If (e1, e2, e3) -> L4If (rename_var_e e1, rename_var_e e2, rename_var_e e3)
+let alpha_renaming get_fresh_l4_var l4_var_map l4_e =
+  let rec alpha_renaming_recr = function
+    | L4Var v ->
+      L4Var (try Hashtbl.find l4_var_map v
+             with Not_found ->
+               failwith "l4c: alpha_renaming: unbound variable " ^ v)
+    | L4Add (l, r) -> L4Add (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4Sub (l, r) -> L4Sub (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4Mul (l, r) -> L4Mul (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4Less (l, r) -> L4Less (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4LessEq (l, r) -> L4LessEq (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4Equal (l, r) -> L4Equal (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4NumberQo e -> L4NumberQo (alpha_renaming_recr e)
+    | L4AQo e -> L4AQo (alpha_renaming_recr e)
+    | L4App (f, args) -> L4App (alpha_renaming_recr f, (List.map alpha_renaming_recr args))
+    | L4NewArray (l, r) -> L4NewArray (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4NewTuple vals -> L4NewTuple (List.map alpha_renaming_recr vals)
+    | L4Aref (l, r) -> L4Aref (alpha_renaming_recr l, alpha_renaming_recr r)
+    | L4Aset (e1, e2, e3) -> L4Aset (alpha_renaming_recr e1, alpha_renaming_recr e2, alpha_renaming_recr e3)
+    | L4Alen e -> L4Alen (alpha_renaming_recr e)
+    | L4Begin (e1, e2) -> L4Begin (alpha_renaming_recr e1, alpha_renaming_recr e2)
+    | L4Print e -> L4Print (alpha_renaming_recr e)
+    | L4MakeClosure (labl, e) -> L4MakeClosure (labl, alpha_renaming_recr e)
+    | L4ClosureProc e -> L4ClosureProc (alpha_renaming_recr e)
+    | L4ClosureVars e -> L4ClosureVars (alpha_renaming_recr e)
+    | L4If (e1, e2, e3) -> L4If (alpha_renaming_recr e1, alpha_renaming_recr e2, alpha_renaming_recr e3)
     | L4Let ((var, e1), e2) ->
       let new_l4_var = get_fresh_l4_var () in
-        let renamed_e1 = rename_var_e e1 in
+        let renamed_e1 = alpha_renaming_recr e1 in
         begin
           Hashtbl.add l4_var_map var new_l4_var;
-          let renamed_e2 = rename_var_e e2 in
+          let renamed_e2 = alpha_renaming_recr e2 in
           begin
             Hashtbl.remove l4_var_map var;
             L4Let ((new_l4_var, renamed_e1), renamed_e2)
           end
-
         end
     | _ as e -> e
   in
-  rename_var_e l4_e
+  alpha_renaming_recr l4_e
 
 let rename_var_l4_f = function
   | L4Fun (labl, args, body_e) ->
@@ -199,14 +201,14 @@ let rename_var_l4_f = function
         end
     in
     let renamed_args = List.map rename_l4_args args in
-    let renamed_body_e = rename_var_l4_e get_fresh_l4_var l4_var_map body_e in
+    let renamed_body_e = alpha_renaming get_fresh_l4_var l4_var_map body_e in
     L4Fun (labl, renamed_args, renamed_body_e)
 
 let compile_l4_p = function
   | L4Prog (prog_e, fundefs) ->
     (* preprocessing happen here *)
     let processed_prog_e =
-      rename_var_l4_e (get_unique_str_generator l4_var_prefix) (Hashtbl.create 0) prog_e in
+      alpha_renaming (get_unique_str_generator l4_var_prefix) (Hashtbl.create 0) prog_e in
     let processed_fundefs = List.map rename_var_l4_f fundefs in
     L3Prog (compile_l4_e processed_prog_e,
             List.map compile_l4_f processed_fundefs)

@@ -97,17 +97,22 @@ let calc_in_and_out insts_arr =
   let s = gen_and_kill_sets.size
   and gen_arr = gen_and_kill_sets.first
   and kill_arr = gen_and_kill_sets.second in
-  let lable_tbl = calc_label_table insts_arr in
+  let label_tbl = calc_label_table insts_arr in
   (* redundant dummy node in the end of in and out array for convience*)
   let in_arr = Array.make (s+1) SS.empty and out_arr = Array.make (s+1) SS.empty in
+  let find_label labl =
+    try
+    Hashtbl.find label_tbl labl
+    with Not_found -> failwith ("liveness: calc_in_and_out: error: label not found " ^ labl)
+  in
   let rec fix_point () =
     let union_of_succ i =
       match insts_arr.(i) with
       (* jmp direct to lable one successful *)
-      | Expr [Atom "goto"; Atom labl] -> in_arr.(Hashtbl.find lable_tbl labl)
+      | Expr [Atom "goto"; Atom labl] -> in_arr.(find_label labl)
       (* conditioncal jump 2 successor *)
       | Expr [Atom "cjump"; Atom t1; Atom cmp; Atom t2; Atom lable1; Atom lable2] ->
-        SS.union in_arr.(Hashtbl.find lable_tbl lable1) in_arr.(Hashtbl.find lable_tbl lable2)
+        SS.union in_arr.(find_label lable1) in_arr.(find_label lable2)
       (* return and tail-call end of control flow *)
       | Expr [Atom "return"]
       | Expr [Atom "call"; Atom "array-error"; Atom "2"]
@@ -152,7 +157,7 @@ let print_two_sests {size; first; second} n1 n2 =
   print_endline ")"
   end
 
-(* 
+(*
 let run_test () =
   let in_and_outs s = List.iter (fun f -> print_two_sests (liveness_analysis f) "in" "out") (parse_string s) in
   let f0 = "(:f 0 0

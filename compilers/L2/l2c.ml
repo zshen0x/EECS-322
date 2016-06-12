@@ -31,8 +31,8 @@ let compile_inst spills replace = function
 
 
 (* register allocation work here *)
-let compile_function prefix f_expr =
-  match f_expr with
+let compile_function prefix orig_fexpr =
+  match orig_fexpr with
   | Expr (f_label :: vars :: Atom spills_str :: insts) ->
     let ig, my_vars = build_interference_graph (Array.of_list insts) in
     let var_to_spill a_ig =
@@ -55,7 +55,16 @@ let compile_function prefix f_expr =
     in
     let rec coloring_spill_loop f_expr a_ig vars spills_str insts =
       let spills = int_of_string spills_str in
-      begin match graph_color a_ig with
+      let mapping =
+        try
+          graph_color a_ig
+        with
+        | Not_found -> begin
+            print_sexpr_indent [orig_fexpr; f_expr];
+            failwith "l2c: coloring_spill_loop: "
+          end
+      in
+      begin match mapping with
       | Some var2reg ->
         Some (Expr (f_label :: vars :: Atom spills_str
               :: List.map (compile_inst spills (replace_f_gen var2reg)) insts))
@@ -74,7 +83,7 @@ let compile_function prefix f_expr =
         end
       end
     in
-    coloring_spill_loop f_expr ig vars spills_str insts
+    coloring_spill_loop orig_fexpr ig vars spills_str insts
   | _ -> failwith "l2c: register allocation: not a valid function expression"
 
 let compile_l2_prog = function
@@ -89,7 +98,7 @@ let compile_l2_prog = function
         | [] -> acc
       end
     in
-    let prefix = "l2_" in
+    let prefix = "l2spill" in
     let fold_functions f_expr = function
       | Some acc ->
           begin match compile_function prefix f_expr with
