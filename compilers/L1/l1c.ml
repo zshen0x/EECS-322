@@ -95,7 +95,7 @@ let is_sx s =
 
 let is_a = function
     "rdi" | "rsi" | "rdx" | "r8" | "r9" -> true
-  | _ as s -> is_sx s
+  | sx -> is_sx sx
 
 let is_label s =
   let r = Str.regexp "^:[a-zA-Z_][a-zA-Z_0-9]*$" in
@@ -103,12 +103,16 @@ let is_label s =
 
 let is_w = function
     "rax" | "rbx" | "rbp" | "r10" | "r11" | "r12" | "r13" | "r14" | "r15" -> true
-  | _ as s -> is_a s
+  | s -> is_a s
 
 let is_x s = is_w s || s = "rsp";;
 let is_u s = is_w s || is_label s;;
 let is_t s = is_x s || is_integer s;;
 let is_s s = is_x s || is_integer s || is_label s;;
+
+let is_l1Reg = function
+  | Reg _ -> true
+  | _ -> false
 
 (* to get list of l1 *)
 let parse_func_sexpr = function
@@ -240,13 +244,13 @@ let compile_l1 = function
   | Call (f, Number n) ->
     "subq $" ^ string_of_int (((if (Int64.to_int n) > 6 then (Int64.to_int n) - 6 else 0) + 1) * 8)
     ^ ", %rsp\n"
-    ^ "jmp " ^ (if is_reg f then "*" else "") ^ compile_rnlm f
+    ^ "jmp " ^ (if is_l1Reg f then "*" else "") ^ compile_rnlm f
       (* do argument space allocate and pass val only when call via move rsp*)
   | Tail_call (f, my_args, callee_args, spills) ->
     "addq $"
     ^ string_of_int (((if (Int64.to_int callee_args) > 6 then (Int64.to_int callee_args) - 6 else 0) + Int64.to_int spills) * 8)
     ^ ", %rsp\n"
-    ^ "jmp " ^ (if is_reg f then "*" else "") ^ compile_rnlm f
+    ^ "jmp " ^ (if is_l1Reg f then "*" else "") ^ compile_rnlm f
       (* "function can only be called at tail position when they have 6 or fewer args so not args in stack "*)
   | Print -> "call print"
   | Read -> "call read"
@@ -265,7 +269,7 @@ let compile_func = function
     let inst0 = compile_l1 l1labl ^ "\n" in
     let inst1 =
       "subq $"
-      ^ Int64.to_string (((if (Int64.to_int args) > 6 then (Int64.to_int args) - 6 else 0) + Int64.to_int spills) * 8)
+      ^ string_of_int (((if (Int64.to_int args) > 6 then (Int64.to_int args) - 6 else 0) + Int64.to_int spills) * 8)
       ^ ", %rsp" in
     (* allocate spill when function are defined *)
     (inst0 ^ inst1) :: List.map compile_l1 rest
