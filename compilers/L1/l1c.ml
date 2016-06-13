@@ -237,16 +237,16 @@ let compile_l1 = function
         inst1 ^ inst2 ^ inst3
     end
   | Goto lb -> "jmp " ^ compile_rnlm lb
-  | Call (labl, Number n) ->
+  | Call (f, Number n) ->
     "subq $" ^ string_of_int (((if (Int64.to_int n) > 6 then (Int64.to_int n) - 6 else 0) + 1) * 8)
     ^ ", %rsp\n"
-    ^ "jmp " ^ compile_rnlm labl
+    ^ "jmp " ^ (if is_reg f then "*" else "") ^ compile_rnlm f
       (* do argument space allocate and pass val only when call via move rsp*)
-  | Tail_call (labl, my_args, callee_args, spills) ->
+  | Tail_call (f, my_args, callee_args, spills) ->
     "addq $"
     ^ string_of_int (((if (Int64.to_int callee_args) > 6 then (Int64.to_int callee_args) - 6 else 0) + Int64.to_int spills) * 8)
     ^ ", %rsp\n"
-    ^ "jmp " ^ compile_rnlm labl
+    ^ "jmp " ^ (if is_reg f then "*" else "") ^ compile_rnlm f
       (* "function can only be called at tail position when they have 6 or fewer args so not args in stack "*)
   | Print -> "call print"
   | Read -> "call read"
@@ -263,7 +263,10 @@ let compile_l1 = function
 let compile_func = function
   | (Label lb as l1labl) :: Number args :: Number spills :: rest ->
     let inst0 = compile_l1 l1labl ^ "\n" in
-    let inst1 = "subq $" ^ Int64.to_string (Int64.mul spills (Int64.of_int 8)) ^ ", %rsp" in
+    let inst1 =
+      "subq $"
+      ^ Int64.to_string (((if (Int64.to_int args) > 6 then (Int64.to_int args) - 6 else 0) + Int64.to_int spills) * 8)
+      ^ ", %rsp" in
     (* allocate spill when function are defined *)
     (inst0 ^ inst1) :: List.map compile_l1 rest
   | _ -> failwith "l1c error: not a valid form of valid l1 list function in compile_func"
